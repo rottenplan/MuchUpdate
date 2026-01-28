@@ -147,12 +147,8 @@ void SynchronizeScreen::handleTouch(int x, int y) {
   }
 
   // Sync Button Area (Bottom Position)
-  // BtnW=240, BtnH=50. Centered X=(480-240)/2=120.
-  // X: 120 to 360. Y: 200 to 250.
-  int btnX = (SCREEN_WIDTH - 240) / 2;
-  int btnW = 240;
-
-  if (!_isSyncing && y >= 190 && y <= 260 && x >= btnX && x <= (btnX + btnW)) {
+  // BtnY = 200, BtnH = 50 -> Touch Y: 190 to 260 approx
+  if (!_isSyncing && y >= 190 && y <= 260) {
     _isSyncing = true;
     _statusMessage = "CONNECTING...";
     _detailMessage = "Checking WiFi...";

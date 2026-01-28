@@ -788,6 +788,8 @@ void HistoryScreen::drawViewData() {
     tft->fillRoundRect(15 + boxW, startY, boxW, boxH, 5, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01); // Reset Font
+    tft->setTextSize(1);
     tft->drawString("0-100 KPH", 20 + boxW, startY + 5);
     tft->setTextColor(TFT_ORANGE, 0x18E3);
     tft->setTextDatum(MC_DATUM);
@@ -802,6 +804,8 @@ void HistoryScreen::drawViewData() {
     tft->fillRoundRect(10, Y2, boxW, boxH, 5, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01); // Reset Font
+    tft->setTextSize(1);
     tft->drawString("100-200 KPH", 15, Y2 + 5);
     tft->setTextColor(TFT_CYAN, 0x18E3);
     tft->setTextDatum(MC_DATUM);
@@ -814,6 +818,8 @@ void HistoryScreen::drawViewData() {
     tft->fillRoundRect(15 + boxW, Y2, boxW, boxH, 5, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01); // Reset Font
+    tft->setTextSize(1);
     tft->drawString("402m (1/4)", 20 + boxW, Y2 + 5);
     tft->setTextColor(TFT_GREEN, 0x18E3);
     tft->setTextDatum(MC_DATUM);
@@ -857,6 +863,8 @@ void HistoryScreen::drawViewData() {
     tft->fillRoundRect(15 + boxW, startY, boxW, boxH, 5, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01); // Reset Font
+    tft->setTextSize(1);
     tft->drawString("VALID LAPS", 20 + boxW, startY + 5);
     tft->setTextColor(TFT_SKYBLUE, 0x18E3);
     tft->setTextDatum(MC_DATUM);
@@ -871,6 +879,8 @@ void HistoryScreen::drawViewData() {
     tft->fillRoundRect(10, Y2, boxW, boxH, 8, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01); // Reset Font
+    tft->setTextSize(1);
     tft->drawString("DISTANCE (km)", 15, Y2 + 5);
     tft->setTextColor(TFT_ORANGE, 0x18E3);
     tft->setTextDatum(MC_DATUM);
@@ -881,6 +891,8 @@ void HistoryScreen::drawViewData() {
     tft->fillRoundRect(15 + boxW, Y2, boxW, boxH, 8, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
+    tft->setFreeFont(&Org_01); // Reset Font
+    tft->setTextSize(1);
     tft->drawString("MAX SPEED", 20 + boxW, Y2 + 5);
     tft->setTextColor(TFT_RED, 0x18E3);
     tft->setTextDatum(MC_DATUM);
