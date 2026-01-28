@@ -38,7 +38,8 @@ UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _lastBat = -1;
   _lastLogging = false;
   _lastWifiStatus = -1;
-  _isDarkMode = true; // Default Dark
+  _isDarkMode = true;         // Default Dark
+  _debugTouchEnabled = false; // Debug touch disabled by default
 }
 
 void UIManager::begin() {
@@ -56,7 +57,6 @@ void UIManager::begin() {
   _speedometerScreen = new SpeedometerScreen();
   _gpsStatusScreen = new GpsStatusScreen();
   _synchronizeScreen = new SynchronizeScreen();
-  _synchronizeScreen = new SynchronizeScreen();
   _gnssLogScreen = new GnssLogScreen();
   _webServerScreen = new WebServerScreen();
 
@@ -73,7 +73,6 @@ void UIManager::begin() {
   _rpmSensorScreen->begin(this);
   _speedometerScreen->begin(this);
   _gpsStatusScreen->begin(this);
-  _synchronizeScreen->begin(this);
   _synchronizeScreen->begin(this);
   _gnssLogScreen->begin(this);
   _webServerScreen->begin(this);
@@ -103,6 +102,11 @@ void UIManager::begin() {
     break; // Never
   }
   setAutoOff(ms);
+
+  // Load debug touch setting
+  prefs.begin("laptimer", true);
+  _debugTouchEnabled = prefs.getBool("debug_touch", false);
+  prefs.end();
   _lastInteractionTime = millis();
   _isScreenOff = false;
   _currentBrightness = 255; // Default max, should load from prefs if we had a
@@ -184,20 +188,17 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     int rawX = _touch->points[0].x;
     int rawY = _touch->points[0].y;
 
-    // Kalibrasi untuk Layar 320x240
-    // Y Mentah biasanya masuk 0-320 tetapi layar adalah 0-240.
-    // X Mentah biasanya 0-320 sesuai lebar layar.
-    // Pemetaan Standar 1:1 (GT911 biasanya skala otomatis)
-    // Jika tidak akurat, periksa Monitor Serial untuk output "Touch: Raw..."
-    // Kalibrasi Manual / Pemetaan dari config.h
+    // Calibration for 480x320 Display (Landscape)
+    // Touch controller native: 320x480 (Portrait)
+    // After swap: rawY (0-480) → screenX, rawX (0-320) → screenY
     int pX = rawX;
     int pY = rawY;
 
-    // 1. Tukar XY
+    // 1. Swap XY (Portrait to Landscape)
     if (TOUCH_SWAP_XY) {
       int temp = pX;
-      pX = pY;   // pX sekarang menampung RawY (0-320 kira-kira)
-      pY = temp; // pY sekarang menampung RawX (0-240 kira-kira)
+      pX = pY;   // pX now holds rawY (0-480 for screen X)
+      pY = temp; // pY now holds rawX (0-320 for screen Y)
     }
 
     // 2. Balik X (Koordinat Layar)
@@ -216,16 +217,17 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     // Batasi
     if (p.x < 0)
       p.x = 0;
-    if (p.x > 320)
-      p.x = 320;
+    if (p.x >= SCREEN_WIDTH)
+      p.x = SCREEN_WIDTH - 1;
     if (p.y < 0)
       p.y = 0;
-    if (p.y > 240)
-      p.y = 240;
+    if (p.y >= SCREEN_HEIGHT)
+      p.y = SCREEN_HEIGHT - 1;
 
-    // Debug: Lacak koordinat sentuh
-    // Serial.printf("Touch: Raw[%d,%d] -> Screen[%d,%d]\n", rawX, rawY, p.x,
-    // p.y);
+    // Draw debug dot if enabled
+    if (_debugTouchEnabled) {
+      _tft->fillCircle(p.x, p.y, 3, TFT_RED);
+    }
 
     // Global Debounce Logic (250ms)
     unsigned long now = millis();
@@ -307,6 +309,10 @@ void UIManager::switchScreen(ScreenType type) {
     break;
   case SCREEN_GPS_STATUS:
     _currentScreen = _gpsStatusScreen;
+    break;
+  case SCREEN_SYNCHRONIZE:
+    _currentScreen = _synchronizeScreen;
+    _screenTitle = "SYNCHRONIZE";
     break;
   case SCREEN_GNSS_LOG:
     _currentScreen = _gnssLogScreen;
@@ -475,6 +481,7 @@ void UIManager::drawStatusBar(bool force) {
   static int lastPct = -1;
   static float lastVolts = 0;
 
+#ifdef PIN_BATTERY
   if (millis() - lastBatRead > 5000 || lastPct == -1) {
     lastBatRead = millis();
     int rawADC = analogRead(PIN_BATTERY);
@@ -490,6 +497,7 @@ void UIManager::drawStatusBar(bool force) {
       lastPct = (int)((lastVolts - 3.0) / (4.2 - 3.0) * 100);
     }
   }
+#endif
 
   int pct = lastPct;
   float voltage = lastVolts;
@@ -498,6 +506,7 @@ void UIManager::drawStatusBar(bool force) {
   // Max = 4.2, Min = 3.0
   // (Logic moved above)
 
+#ifdef PIN_BATTERY
   if (force || abs(pct - _lastBat) > 2) { // Update if changed by > 2%
     _lastBat = pct;
 
@@ -512,7 +521,7 @@ void UIManager::drawStatusBar(bool force) {
     String pctStr = String(pct) + "% (" + String(voltage, 1) + "V)";
     // Also debug raw to Serial if possible, but screen is better for user
     // feedback
-    Serial.printf("Bat: V=%f Pct=%d\n", voltage, pct);
+    // Serial.printf("Bat: V=%f Pct=%d\n", voltage, pct);
     _tft->drawString(pctStr, SCREEN_WIDTH - 32, 10); // Centered at 10
 
     // Gambar Ikon Baterai
@@ -535,6 +544,7 @@ void UIManager::drawStatusBar(bool force) {
 
     _lastBat = pct;
   }
+#endif
 
   // --- Indikator Perekaman ---
   bool isLogging = sessionManager.isLogging();

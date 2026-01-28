@@ -1,4 +1,6 @@
 #include "SetupScreen.h"
+#include "../../config.h"
+#include "../../core/SyncManager.h"
 #include "../../core/WiFiManager.h"
 #include "../fonts/Org_01.h"
 
@@ -40,16 +42,22 @@ void SetupScreen::update() {
     switch (_currentStep) {
     case STEP_ACCOUNT:
       if (_isEditingUsername)
-        drawTextField("USERNAME", _username, 30, _isEditingUsername, false);
+        drawTextField("USERNAME", _username, 40, _isEditingUsername, false);
       else if (_isEditingAccountPassword)
-        drawTextField("PASSWORD", _password, 70, _isEditingAccountPassword,
+        drawTextField("PASSWORD", _password, 90, _isEditingAccountPassword,
                       true);
       break;
     case STEP_WIFI:
-      if (_isEditingSSID)
-        drawTextField("SSID", _wifiSSID, 30, _isEditingSSID, false);
-      else if (_isEditingPassword)
-        drawTextField("PASSWORD", _wifiPassword, 70, _isEditingPassword, true);
+      if (_wifiSSID.length() == 0) {
+        if (_isEditingSSID)
+          drawTextField("SSID", _wifiSSID, 50, _isEditingSSID, false);
+        else if (_isEditingPassword)
+          drawTextField("PASSWORD", _wifiPassword, 100, _isEditingPassword,
+                        true);
+      } else {
+        if (_isEditingPassword)
+          drawTextField("PASSWORD", _wifiPassword, 80, true, true);
+      }
       break;
     default:
       break;
@@ -95,20 +103,20 @@ void SetupScreen::drawWelcome() {
   tft->setTextDatum(MC_DATUM);
 
   // Title
-  tft->setTextSize(1);
+  tft->setTextSize(2);
   tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
   tft->drawString("WELCOME TO", SCREEN_WIDTH / 2, 75);
 
-  tft->setTextSize(2);
+  tft->setTextSize(4);
   tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
-  tft->drawString("MUCH RACING", SCREEN_WIDTH / 2, 90);
+  tft->drawString("MUCH RACING", SCREEN_WIDTH / 2, 105);
 
-  tft->setTextSize(1);
+  tft->setTextSize(2);
   tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-  tft->drawString("LET'S GET STARTED", SCREEN_WIDTH / 2, 130);
+  tft->drawString("LET'S GET STARTED", SCREEN_WIDTH / 2, 145);
 
-  // Continue button
-  drawButton("TAP TO BEGIN", SCREEN_WIDTH / 2 - 80, 180, 160, 40, false);
+  // Continue button (larger)
+  drawButton("TAP TO BEGIN", SCREEN_WIDTH / 2 - 120, 200, 240, 60, false);
 }
 
 void SetupScreen::drawComplete() {
@@ -129,11 +137,11 @@ void SetupScreen::drawComplete() {
 
   if (_username.length() > 0) {
     String msg = "WELCOME " + _username + "!";
-    tft->drawString(msg, SCREEN_WIDTH / 2, 150);
+    tft->drawString(msg, SCREEN_WIDTH / 2, 165);
   }
 
-  // Continue button
-  drawButton("START RACING", SCREEN_WIDTH / 2 - 80, 180, 160, 40, false);
+  // Continue button (larger and lower)
+  drawButton("START RACING", SCREEN_WIDTH / 2 - 100, 210, 200, 50, false);
 }
 
 // Updated Account Setup (Compact Layout)
@@ -150,19 +158,18 @@ void SetupScreen::drawAccountSetup(bool fullRedraw) {
     tft->setTextDatum(TC_DATUM);
     tft->drawString("ACCOUNT SETUP", SCREEN_WIDTH / 2, 5);
 
-    // Nav Buttons
-    // Skip button removed to enforce registration
-    drawButton("NEXT", SCREEN_WIDTH - 55, 2, 50, 20,
-               _username.length() > 0 && _password.length() > 0);
+    // Nav Buttons (Compact)
+    drawButton("NEXT", SCREEN_WIDTH - 65, 5, 60, 25,
+               _username.length() > 0 && _password.length() > 0, 1);
   }
 
-  // Fields (Compact: Y=30, Y=70)
-  drawTextField("USERNAME", _username, 30, _isEditingUsername, false);
-  drawTextField("PASSWORD", _password, 70, _isEditingAccountPassword, true);
+  // Fields (Adjusted for 480x320: Y=40, Y=90)
+  drawTextField("USERNAME", _username, 40, _isEditingUsername, false);
+  drawTextField("PASSWORD", _password, 90, _isEditingAccountPassword, true);
 
-  // Keyboard (Y=110)
+  // Keyboard (Y=140)
   if (_isEditingUsername || _isEditingAccountPassword) {
-    drawKeyboard(110, _isEditingAccountPassword);
+    drawKeyboard(140, _isEditingAccountPassword);
   }
 }
 
@@ -170,54 +177,50 @@ void SetupScreen::drawTextField(const char *label, String value, int y,
                                 bool isActive, bool isPassword) {
   TFT_eSPI *tft = _ui->getTft();
 
+  // Calculate centered box
+  int boxW = 260; // Reduced from 300 for even cleaner layout
+  if (boxW > SCREEN_WIDTH - 20)
+    boxW = SCREEN_WIDTH - 20; // Safety constraint
+  int boxX = (SCREEN_WIDTH - boxW) / 2;
+
   // Use Org_01 (Tiny Font) for the Label
   tft->setFreeFont(&Org_01);
   tft->setTextSize(1);
   tft->setTextDatum(BL_DATUM);
   tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-  tft->drawString(label, 10, y);
+  tft->drawString(label, boxX, y);
 
-  // Field background (Start box at y+2 to give gap)
-  // Box: y+2 to y+27 (Height 25)
+  // Field background (Start box at y+2 to give gap, taller box)
+  // Box: y+2 to y+32 (Height 30, increased from 25)
   uint16_t borderColor = isActive ? COLOR_PRIMARY : COLOR_SECONDARY;
-  tft->drawRect(10, y + 2, SCREEN_WIDTH - 20, 25, borderColor);
-  tft->fillRect(11, y + 3, SCREEN_WIDTH - 22, 23, TFT_DARKGREY);
+  tft->drawRect(boxX, y + 2, boxW, 30, borderColor);
+  tft->fillRect(boxX + 1, y + 3, boxW - 2, 28, TFT_DARKGREY);
 
   // Switch back to Standard Font 1 for Value
   tft->setTextFont(1);
   tft->setTextSize(1);
 
-  // Field value
+  // Field value (Masking removed as per user request)
   String displayValue = value;
-  if (isPassword && !_showPassword && value.length() > 0) {
-    displayValue = "";
-    for (int i = 0; i < value.length(); i++) {
-      displayValue += "*";
-    }
-  }
 
-  // Draw Value centered in box (y + 2 + 12.5 = ~y+15)
+  // Draw Value centered in box (adjusted for taller box)
   tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
   tft->setTextDatum(ML_DATUM);
-  tft->drawString(displayValue, 15, y + 15);
+  tft->drawString(displayValue, boxX + 5, y + 17);
 
   // Password Toggle Button for WiFi (Right aligned in box)
-  if (isPassword) {
-    tft->setTextDatum(MR_DATUM);
-    tft->setTextColor(COLOR_HIGHLIGHT, TFT_DARKGREY);
-    tft->drawString(_showPassword ? "HIDE" : "SHOW", SCREEN_WIDTH - 15, y + 15);
-  }
+  // Password Toggle Button Removed (Always show)
 
   // Cursor
   if (isActive && _cursorVisible) {
-    int cursorX = 15 + tft->textWidth(displayValue);
-    // Cursor Line: y+7 to y+23 (16px tall centered)
-    tft->drawFastVLine(cursorX, y + 7, 16, COLOR_PRIMARY);
+    int cursorX = boxX + 5 + tft->textWidth(displayValue);
+    // Cursor Line: y+7 to y+25 (18px tall, adjusted for taller box)
+    tft->drawFastVLine(cursorX, y + 8, 18, COLOR_PRIMARY);
   }
 }
 
 void SetupScreen::drawButton(const char *label, int x, int y, int w, int h,
-                             bool isHighlighted) {
+                             bool isHighlighted, int fontSize) {
   TFT_eSPI *tft = _ui->getTft();
 
   uint16_t bgColor = isHighlighted ? COLOR_PRIMARY : _ui->getBackgroundColor();
@@ -228,7 +231,7 @@ void SetupScreen::drawButton(const char *label, int x, int y, int w, int h,
   tft->fillRect(x, y, w, h, bgColor);
   tft->drawRect(x, y, w, h, borderColor);
 
-  tft->setTextSize(1);
+  tft->setTextSize(fontSize);
   tft->setTextDatum(MC_DATUM);
   tft->setTextColor(textColor, bgColor);
   tft->drawString(label, x + w / 2, y + h / 2);
@@ -243,16 +246,15 @@ void SetupScreen::drawWiFiScan() {
   TFT_eSPI *tft = _ui->getTft();
   tft->fillScreen(_ui->getBackgroundColor());
 
-  // Header (Small Font 1)
+  // Header (Back to Size 1)
   tft->setTextFont(1);
   tft->setTextSize(1);
   tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
   tft->setTextDatum(TC_DATUM);
   tft->drawString("SELECT WIFI NETWORK", SCREEN_WIDTH / 2, 5);
 
-  // Nav Buttons
-  // Skip button removed
-  drawButton("SCAN", SCREEN_WIDTH - 55, 2, 50, 20, false);
+  // Nav Buttons (Compact)
+  drawButton("SCAN", SCREEN_WIDTH - 65, 5, 60, 25, false, 1);
 
   if (!_hasScanned) {
     tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
@@ -279,6 +281,8 @@ void SetupScreen::drawWiFiScan() {
     String ssid = wifiManager.getSSID(i);
     if (ssid.length() > 18)
       ssid = ssid.substring(0, 15) + "...";
+    // SSID List (Size 1)
+    tft->setTextSize(1);
     tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
     tft->setTextDatum(ML_DATUM);
     tft->drawString(ssid, 30, y + 15);
@@ -287,9 +291,10 @@ void SetupScreen::drawWiFiScan() {
     tft->drawString(String(rssi) + "dB", SCREEN_WIDTH - 30, y + 15);
   }
 
-  // Custom Manual Entry Option
+  // Custom Manual Entry Option (Size 1)
   int visibleCount = (_scanCount > limit) ? limit : _scanCount;
   int y = startY + visibleCount * itemH;
+  tft->setTextSize(1); // Back to 1
   tft->setTextColor(COLOR_HIGHLIGHT, _ui->getBackgroundColor());
   tft->setTextDatum(MC_DATUM);
   tft->drawString("Manually Enter SSID", SCREEN_WIDTH / 2, y + 15);
@@ -308,18 +313,48 @@ void SetupScreen::drawWiFiSetup(bool fullRedraw) {
     tft->setTextDatum(TC_DATUM);
     tft->drawString("ENTER WIFI PASSWORD", SCREEN_WIDTH / 2, 5);
 
-    // Nav Buttons
-    drawButton("BACK", 5, 2, 45, 20, false);
-    drawButton("CONN", SCREEN_WIDTH - 55, 2, 50, 20, _wifiSSID.length() > 0);
+    // Nav Buttons (Compact)
+    drawButton("BACK", 5, 5, 60, 25, false, 1);
+    drawButton("CONN", SCREEN_WIDTH - 65, 5, 60, 25, _wifiSSID.length() > 0, 1);
+
+    // Status Indicator (Small)
+    tft->setTextDatum(TC_DATUM);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(1);
+    if (wifiManager.isConnected()) {
+      tft->setTextColor(TFT_GREEN, _ui->getBackgroundColor());
+      tft->drawString("STATUS: CONNECTED", SCREEN_WIDTH / 2, 28);
+    } else {
+      tft->setTextColor(TFT_RED, _ui->getBackgroundColor());
+      tft->drawString("STATUS: NOT CONNECTED", SCREEN_WIDTH / 2, 28);
+    }
   }
 
-  // Fields (Compact: Y=30, Y=70)
-  drawTextField("SSID", _wifiSSID, 30, _isEditingSSID, false);
-  drawTextField("PASSWORD", _wifiPassword, 70, _isEditingPassword, true);
+  // Fields (Conditional logic to remove redundancy)
+  if (_wifiSSID.length() == 0) {
+    // Manual Entry Mode: Show both SSID and Password boxes
+    drawTextField("SSID", _wifiSSID, 50, _isEditingSSID, false);
+    drawTextField("PASSWORD", _wifiPassword, 100, _isEditingPassword, true);
 
-  // Keyboard (Y=110)
-  if (_isEditingSSID || _isEditingPassword) {
-    drawKeyboard(110, true);
+    // Keyboard (Y=150)
+    if (_isEditingSSID || _isEditingPassword) {
+      drawKeyboard(150, true);
+    }
+  } else {
+    // Selection Mode: SSID is known, just show it as a label and focus on
+    // Password
+    tft->setTextFont(1);
+    tft->setTextSize(1);
+    tft->setTextColor(COLOR_HIGHLIGHT, _ui->getBackgroundColor());
+    tft->setTextDatum(TC_DATUM);
+    tft->drawString("Network: " + _wifiSSID, SCREEN_WIDTH / 2, 40);
+
+    drawTextField("PASSWORD", _wifiPassword, 80, true, true);
+    _isEditingPassword = true;
+    _isEditingSSID = false;
+
+    // Keyboard (Y=130 - Higher up since there's only one box)
+    drawKeyboard(130, true);
   }
 }
 
@@ -327,8 +362,9 @@ void SetupScreen::drawWiFiSetup(bool fullRedraw) {
 
 void SetupScreen::handleWelcomeTouch(int x, int y) {
   // Check if "TAP TO BEGIN" button was pressed
-  if (y >= 180 && y <= 220 && x >= SCREEN_WIDTH / 2 - 80 &&
-      x <= SCREEN_WIDTH / 2 + 80) {
+  // Button is 240x60 at position (SCREEN_WIDTH/2 - 120, 200)
+  if (y >= 200 && y <= 260 && x >= SCREEN_WIDTH / 2 - 120 &&
+      x <= SCREEN_WIDTH / 2 + 120) {
     nextStep();
   }
 }
@@ -336,8 +372,9 @@ void SetupScreen::handleWelcomeTouch(int x, int y) {
 void SetupScreen::handleWiFiScanTouch(int x, int y) {
   // Skip logic removed
 
-  // Rescan (Top Right)
-  if (y < 40 && x > SCREEN_WIDTH - 60) {
+  // Rescan (Top Right Button: SCAN)
+  // Button is 60x25 at SCREEN_WIDTH-65, 5
+  if (y >= 5 && y <= 30 && x >= SCREEN_WIDTH - 65 && x <= SCREEN_WIDTH - 5) {
     _scanCount = 0;
     _hasScanned = false;
     drawWiFiScan();
@@ -368,10 +405,10 @@ void SetupScreen::handleWiFiScanTouch(int x, int y) {
       return;
     }
   }
-  // Manual Entry
+  // Manual Entry (Y+20 spacing for MC_DATUM)
   int visibleCount = (_scanCount > limit) ? limit : _scanCount;
   int manY = startY + visibleCount * itemH;
-  if (y > manY && y < manY + 30) {
+  if (y > manY && y < manY + 40) { // Height ~40px hit area
     _wifiSSID = "";
     _wifiPassword = "";
     _currentStep = STEP_WIFI;
@@ -379,108 +416,135 @@ void SetupScreen::handleWiFiScanTouch(int x, int y) {
   }
 }
 
-// Touch Handlers with updated Y coordinates
+// Touch Handlers with seasonal Y coordinates
 void SetupScreen::handleWiFiTouch(int x, int y) {
-  // Check SSID field
-  if (y >= 30 && y <= 60) {
-    _isEditingSSID = true;
-    _isEditingPassword = false;
-    drawWiFiSetup(false);
+  // Nav Buttons (BACK, CONN)
+  // BACK Button: 5, 5, 60, 25
+  if (y >= 5 && y <= 35 && x >= 5 && x <= 70) {
+    _currentStep = STEP_WIFI_SCAN;
+    drawWiFiScan();
     return;
   }
-
-  // Toggle Show (Check BEFORE Field Focus)
-  if (x >= SCREEN_WIDTH - 60 && y >= 70 && y <= 100) {
-    _showPassword = !_showPassword;
-    _isEditingPassword = true; // Also focus
-    _isEditingSSID = false;
-    drawWiFiSetup(false);
-    return;
-  }
-
-  // Check Password field
-  if (y >= 70 && y <= 100) {
-    _isEditingPassword = true;
-    _isEditingSSID = false;
-    drawWiFiSetup(false);
-    return;
-  }
-
-  // Keyboard
-  if ((_isEditingSSID || _isEditingPassword) && y >= 110) {
-    KeyboardComponent::KeyResult res = _keyboard.handleTouch(x, y, 110);
-    String &target = _isEditingSSID ? _wifiSSID : _wifiPassword;
-
-    if (res.type == KeyboardComponent::KEY_CHAR) {
-      char c = res.value;
-      if (!_isUppercase && c >= 'A' && c <= 'Z')
-        c += 32; // To Lowercase
-      handleKeyboardInput(target, c);
-    } else if (res.type == KeyboardComponent::KEY_SHIFT)
-      _isUppercase = !_isUppercase;
-    else if (res.type == KeyboardComponent::KEY_DEL) {
-      if (target.length() > 0)
-        target.remove(target.length() - 1);
-    } else if (res.type == KeyboardComponent::KEY_SPACE)
-      target += " ";
-    else if (res.type == KeyboardComponent::KEY_OK) {
-      _isEditingSSID = false;
-      _isEditingPassword = false;
-    }
-
-    drawWiFiSetup(false);
-    return;
-  }
-  // Nav Buttons (Top)
-  if (y <= 25) {
-    if (x <= 60) {
-      if (millis() - _lastBackTapTime < 500) {
-        _hasScanned = false; // Force rescan
-        _isEditingSSID = false;
-        _isEditingPassword = false;
-        _currentStep = STEP_WIFI_SCAN;
-        drawWiFiScan();
-        _lastBackTapTime = 0;
-      } else {
-        _lastBackTapTime = millis();
-      }
-      return;
-    }
-    if (x >= SCREEN_WIDTH - 90 && _wifiSSID.length() > 0) {
+  // CONN Button: SCREEN_WIDTH-65, 5, 60, 25
+  if (y >= 5 && y <= 35 && x >= SCREEN_WIDTH - 70 && x <= SCREEN_WIDTH - 5) {
+    if (_wifiSSID.length() > 0) {
+      // Draw Connecting Modal
       TFT_eSPI *tft = _ui->getTft();
+      int modalW = 240;
+      int modalH = 80;
+      int modalX = (SCREEN_WIDTH - modalW) / 2;
+      int modalY = (SCREEN_HEIGHT - modalH) / 2;
 
-      // Clear Main Area below Header (30px down)
-      tft->fillRect(0, 30, SCREEN_WIDTH, SCREEN_HEIGHT - 30,
-                    _ui->getBackgroundColor());
-
-      // _ui->drawStatusBar(true); // Removed to prevent overlap
-      tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
+      tft->fillRoundRect(modalX, modalY, modalW, modalH, 8,
+                         _ui->getBackgroundColor());
+      tft->drawRoundRect(modalX, modalY, modalW, modalH, 8, COLOR_PRIMARY);
       tft->setTextDatum(MC_DATUM);
-      tft->drawString("CONNECTING...", SCREEN_WIDTH / 2, 120);
+      tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
+      tft->setTextSize(2);
+      tft->drawString("CONNECTING...", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
 
-      bool connected =
+      // Perform Connection (Blocking ~10s)
+      bool success =
           wifiManager.connect(_wifiSSID.c_str(), _wifiPassword.c_str());
 
-      // Clear Status Area
-      tft->fillRect(0, 100, SCREEN_WIDTH, 50, _ui->getBackgroundColor());
-
-      if (connected) {
+      if (success) {
+        tft->fillRect(modalX + 5, modalY + 5, modalW - 10, modalH - 10,
+                      _ui->getBackgroundColor());
         tft->setTextColor(TFT_GREEN, _ui->getBackgroundColor());
-        tft->drawString("CONNECTED!", SCREEN_WIDTH / 2, 120);
-        delay(1500);
+        tft->drawString("CONNECTED!", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
+        delay(1000);
+        nextStep();
       } else {
+        tft->fillRect(modalX + 5, modalY + 5, modalW - 10, modalH - 10,
+                      _ui->getBackgroundColor());
         tft->setTextColor(TFT_RED, _ui->getBackgroundColor());
-        tft->drawString("FAILED!", SCREEN_WIDTH / 2, 120);
+        tft->drawString("FAILED!", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
         delay(1500);
+        drawWiFiSetup(true); // Redraw to clear modal
       }
-      nextStep();
+    }
+    return;
+  }
+
+  int boxW = 300;
+  int boxX = (SCREEN_WIDTH - boxW) / 2;
+  int boxRight = boxX + boxW;
+
+  if (_wifiSSID.length() == 0) {
+    // Manual Entry Mode: (Y=50, Y=100, KB=150)
+    if (y >= 50 && y <= 82) {
+      _isEditingSSID = true;
+      _isEditingPassword = false;
+      drawWiFiSetup(false);
+      return;
+    }
+    // Password field at 100
+    if (y >= 100 && y <= 132) {
+      _isEditingPassword = true;
+      _isEditingSSID = false;
+      drawWiFiSetup(false);
+      return;
+    }
+    // Keyboard at 150
+    if (y >= 150) {
+      KeyboardComponent::KeyResult res = _keyboard.handleTouch(x, y, 150);
+      String &target = _isEditingSSID ? _wifiSSID : _wifiPassword;
+      // ... same keyboard logic ...
+      if (res.type == KeyboardComponent::KEY_CHAR) {
+        char c = res.value;
+        if (!_isUppercase && c >= 'A' && c <= 'Z')
+          c += 32;
+        handleKeyboardInput(target, c);
+      } else if (res.type == KeyboardComponent::KEY_SHIFT)
+        _isUppercase = !_isUppercase;
+      else if (res.type == KeyboardComponent::KEY_DEL) {
+        if (target.length() > 0)
+          target.remove(target.length() - 1);
+      } else if (res.type == KeyboardComponent::KEY_SPACE)
+        target += " ";
+      else if (res.type == KeyboardComponent::KEY_OK) {
+        _isEditingSSID = false;
+        _isEditingPassword = false;
+      }
+      drawWiFiSetup(false);
+      return;
+    }
+  } else {
+    // Selection Mode: (PW Field=80, KB=130)
+    if (y >= 80 && y <= 112) {
+      _isEditingPassword = true;
+      _isEditingSSID = false;
+      drawWiFiSetup(false);
+      return;
+    }
+    // Keyboard at 130
+    if (y >= 130) {
+      KeyboardComponent::KeyResult res = _keyboard.handleTouch(x, y, 130);
+      if (res.type == KeyboardComponent::KEY_CHAR) {
+        char c = res.value;
+        if (!_isUppercase && c >= 'A' && c <= 'Z')
+          c += 32;
+        handleKeyboardInput(_wifiPassword, c);
+      } else if (res.type == KeyboardComponent::KEY_SHIFT)
+        _isUppercase = !_isUppercase;
+      else if (res.type == KeyboardComponent::KEY_DEL) {
+        if (_wifiPassword.length() > 0)
+          _wifiPassword.remove(_wifiPassword.length() - 1);
+      } else if (res.type == KeyboardComponent::KEY_SPACE)
+        _wifiPassword += " ";
+      else if (res.type == KeyboardComponent::KEY_OK) {
+        _isEditingPassword = false;
+      }
+      drawWiFiSetup(false);
+      return;
     }
   }
 }
 
 void SetupScreen::handleCompleteTouch(int x, int y) {
-  if (y >= 180 && y <= 220 && x >= SCREEN_WIDTH / 2 - 80 &&
-      x <= SCREEN_WIDTH / 2 + 80) {
+  // Button "START RACING" is 200x50 at Y=210
+  if (y >= 210 && y <= 260 && x >= SCREEN_WIDTH / 2 - 100 &&
+      x <= SCREEN_WIDTH / 2 + 100) {
     saveSetupComplete();
     _ui->switchScreen(SCREEN_MENU);
   }
@@ -492,34 +556,42 @@ void SetupScreen::handleKeyboardInput(String &target, char key) {
 }
 
 void SetupScreen::handleAccountTouch(int x, int y) {
-  // Username: 30-60
-  if (y >= 30 && y <= 60) {
+  // NEXT Button (Compact Top Right: 60x25 at SCREEN_WIDTH-65, 5)
+  if (y >= 5 && y <= 35 && x >= SCREEN_WIDTH - 65 && x <= SCREEN_WIDTH - 5) {
+    if (_username.length() > 0 && _password.length() > 0) {
+      nextStep();
+    }
+    return;
+  }
+
+  // Check Username field (Y=40)
+  if (y >= 40 && y <= 72) {
     _isEditingUsername = true;
     _isEditingAccountPassword = false;
+    _isEditingSSID = false;
+    _isEditingPassword = false;
     drawAccountSetup(false);
     return;
   }
 
-  // Toggle Show (Check BEFORE Field Focus)
-  if (x >= SCREEN_WIDTH - 60 && y >= 70 && y <= 100) {
-    _showPassword = !_showPassword;
-    _isEditingAccountPassword = true; // Focus
-    _isEditingUsername = false;
-    drawAccountSetup(false);
-    return;
-  }
+  // Calculate text field position (boxW=260)
+  int boxW = 260;
+  if (boxW > SCREEN_WIDTH - 20)
+    boxW = SCREEN_WIDTH - 20;
+  int boxX = (SCREEN_WIDTH - boxW) / 2;
+  int boxRight = boxX + boxW;
 
-  // Password: 70-100
-  if (y >= 70 && y <= 100) {
+  // Password field (Y=90)
+  if (y >= 90 && y <= 122) {
     _isEditingUsername = false;
     _isEditingAccountPassword = true;
     drawAccountSetup(false);
     return;
   }
 
-  // Keyboard >= 110
-  if ((_isEditingUsername || _isEditingAccountPassword) && y >= 110) {
-    KeyboardComponent::KeyResult res = _keyboard.handleTouch(x, y, 110);
+  // Keyboard (Y=140)
+  if ((_isEditingUsername || _isEditingAccountPassword) && y >= 140) {
+    KeyboardComponent::KeyResult res = _keyboard.handleTouch(x, y, 140);
     String &target = _isEditingUsername ? _username : _password;
 
     if (res.type == KeyboardComponent::KEY_CHAR) {
@@ -542,24 +614,75 @@ void SetupScreen::handleAccountTouch(int x, int y) {
     drawAccountSetup(false);
     return;
   }
-
-  // Nav Buttons
-  if (y <= 25) {
-    // Skip Logic Removed
-    if (x >= SCREEN_WIDTH - 60 && _username.length() > 0)
-      nextStep();
-  }
 }
 
 // Updated nextStep routing
 void SetupScreen::nextStep() {
   switch (_currentStep) {
   case STEP_WELCOME:
-    _currentStep = STEP_ACCOUNT;
-    drawAccountSetup();
+    _currentStep = STEP_WIFI_SCAN;
+    drawWiFiScan();
     break;
   case STEP_ACCOUNT:
-    // Save Account
+    // Enhanced Synchronizing UI (Modal Style)
+    {
+      TFT_eSPI *tft = _ui->getTft();
+      int modalW = 280;
+      int modalH = 100;
+      int modalX = (SCREEN_WIDTH - modalW) / 2;
+      int modalY = (SCREEN_HEIGHT - modalH) / 2;
+
+      // Draw Modal Shadow/Dimming (simple fill)
+      tft->fillRoundRect(modalX + 4, modalY + 4, modalW, modalH, 8, TFT_BLACK);
+      // Main Box
+      tft->fillRoundRect(modalX, modalY, modalW, modalH, 8,
+                         _ui->getBackgroundColor());
+      tft->drawRoundRect(modalX, modalY, modalW, modalH, 8, COLOR_PRIMARY);
+
+      // Header
+      tft->setFreeFont(&Org_01);
+      tft->setTextSize(1);
+      tft->setTextColor(COLOR_ACCENT, _ui->getBackgroundColor());
+      tft->setTextDatum(TC_DATUM);
+      tft->drawString("CLOUD SYNC", SCREEN_WIDTH / 2, modalY + 10);
+
+      // Message
+      tft->setTextFont(1);
+      tft->setTextSize(2);
+      tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
+      tft->setTextDatum(MC_DATUM);
+      tft->drawString("Synchronizing...", SCREEN_WIDTH / 2, modalY + 45);
+
+      // Stylized Progress Bar (Static but looks active)
+      int barW = 200;
+      int barH = 8;
+      int barX = (SCREEN_WIDTH - barW) / 2;
+      int barY = modalY + 75;
+      tft->drawRect(barX, barY, barW, barH, COLOR_SECONDARY);
+      tft->fillRect(barX + 2, barY + 2, barW / 2, barH - 4,
+                    COLOR_ACCENT); // 50% "fake" progress
+
+      extern SyncManager syncManager;
+      // Perform First Sync
+      bool syncSuccess = syncManager.performFirstSync(
+          API_URL, _username.c_str(), _password.c_str());
+
+      // Update Result in Modal
+      tft->fillRect(modalX + 5, modalY + 35, modalW - 10, 30,
+                    _ui->getBackgroundColor());
+      if (syncSuccess) {
+        tft->setTextColor(TFT_GREEN, _ui->getBackgroundColor());
+        tft->drawString("SYNC SUCCESS!", SCREEN_WIDTH / 2, modalY + 45);
+        tft->fillRect(barX + 2, barY + 2, barW - 4, barH - 4,
+                      TFT_GREEN); // Full Green Bar
+      } else {
+        tft->setTextColor(TFT_RED, _ui->getBackgroundColor());
+        tft->drawString("SYNC FAILED", SCREEN_WIDTH / 2, modalY + 45);
+      }
+      delay(1500);
+    }
+
+    // Save Account locally as fallback/cache
     if (_username.length() > 0) {
       Preferences prefs;
       prefs.begin("muchrace", false);
@@ -568,16 +691,16 @@ void SetupScreen::nextStep() {
         prefs.putString("password", _password);
       prefs.end();
     }
-    // Go to Scan
-    _currentStep = STEP_WIFI_SCAN;
-    drawWiFiScan();
+    // Go to Complete
+    _currentStep = STEP_COMPLETE;
+    drawComplete();
     break;
   case STEP_WIFI_SCAN:
     // Handled in touch, but logic flow: Scan -> Wifi Setup
     break;
   case STEP_WIFI:
-    _currentStep = STEP_COMPLETE;
-    drawComplete();
+    _currentStep = STEP_ACCOUNT;
+    drawAccountSetup();
     break;
   default:
     break;

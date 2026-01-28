@@ -67,17 +67,17 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
   }
 
   // --- STATUS CARD ---
-  int cardW = 280; // Widen slightly
-  int cardH = 100; // Compact height
+  int cardW = 400; // Widened for 480 display
+  int cardH = 110; // Slightly taller
   int cardX = (SCREEN_WIDTH - cardW) / 2;
-  int cardY = 60;
+  int cardY = 70; // Moved down slightly
 
   tft->fillRoundRect(cardX, cardY, cardW, cardH, 8, L_COLOR_CARD);
   tft->drawRoundRect(cardX, cardY, cardW, cardH, 8, TFT_DARKGREY);
 
   // Status Text
   tft->setFreeFont(&Org_01);
-  tft->setTextSize(2); // Large for status
+  tft->setTextSize(2);
   tft->setTextDatum(MC_DATUM);
 
   uint16_t statusColor = L_COLOR_TEXT;
@@ -92,24 +92,24 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
   }
 
   tft->setTextColor(statusColor, L_COLOR_CARD);
-  tft->drawString(_statusMessage, SCREEN_WIDTH / 2, cardY + 25);
+  tft->drawString(_statusMessage, SCREEN_WIDTH / 2, cardY + 30);
 
   // Detail Text
   tft->setTextSize(1);
   tft->setTextColor(L_COLOR_LABEL, L_COLOR_CARD);
-  tft->drawString(_detailMessage, SCREEN_WIDTH / 2, cardY + 50);
+  tft->drawString(_detailMessage, SCREEN_WIDTH / 2, cardY + 60);
 
   // Last Sync Info (Inside Card)
   tft->setTextColor(TFT_DARKGREY, L_COLOR_CARD);
   tft->setTextSize(1);
-  String lastSync = "Last: " + syncManager.getLastSyncTime();
-  tft->drawString(lastSync, SCREEN_WIDTH / 2, cardY + 75);
+  String lastSync = "Last Sync: " + syncManager.getLastSyncTime();
+  tft->drawString(lastSync, SCREEN_WIDTH / 2, cardY + 85);
 
   // --- SYNC BUTTON ---
-  int btnW = 180;
-  int btnH = 45;
+  int btnW = 240; // Widened
+  int btnH = 50;  // Slightly taller
   int btnX = (SCREEN_WIDTH - btnW) / 2;
-  int btnY = 170;
+  int btnY = 200; // Moved down to balance
 
   if (!_isSyncing) {
     tft->fillRoundRect(btnX, btnY, btnW, btnH, 8, L_COLOR_BTN);
@@ -147,8 +147,12 @@ void SynchronizeScreen::handleTouch(int x, int y) {
   }
 
   // Sync Button Area (Bottom Position)
-  // BtnY = 170, BtnH = 45 -> Touch Y: 160 to 220 approx
-  if (!_isSyncing && y >= 160 && y <= 220) {
+  // BtnW=240, BtnH=50. Centered X=(480-240)/2=120.
+  // X: 120 to 360. Y: 200 to 250.
+  int btnX = (SCREEN_WIDTH - 240) / 2;
+  int btnW = 240;
+
+  if (!_isSyncing && y >= 190 && y <= 260 && x >= btnX && x <= (btnX + btnW)) {
     _isSyncing = true;
     _statusMessage = "CONNECTING...";
     _detailMessage = "Checking WiFi...";

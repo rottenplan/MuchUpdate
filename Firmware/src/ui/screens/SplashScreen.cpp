@@ -5,37 +5,41 @@
 
 void SplashScreen::onShow() {
   TFT_eSPI *tft = _ui->getTft();
-  // tft->setRotation(1); // Already set in main.cpp
-  // Screen already cleared in main.cpp before backlight turns on
 
-  // Gambar Bitmap (320x240)
-  tft->drawBitmap(0, 0, image_BOLONG_bits, 320, 240, 0xFFFF); // Putih
+  // Center bitmap (320x240) on 480x320 screen
+  int dx = (SCREEN_WIDTH - 320) / 2;  // 80px offset
+  int dy = (SCREEN_HEIGHT - 240) / 2; // 40px offset
+  tft->drawBitmap(dx, dy, image_BOLONG_bits, 320, 240, 0xFFFF);
 
-  // Gambar Teks "ENGINE STARTING" menggunakan Org_01
+  // Draw "ENGINE STARTING" text centered (smaller font)
   tft->setTextColor(0xFFFF);
   tft->setTextSize(FONT_SIZE_SPLASH_TEXT);
   tft->setFreeFont(&Org_01);
-  tft->drawString("ENGINE STARTING", 115, 214);
+  tft->setTextDatum(MC_DATUM);
+  tft->drawString("ENGINE STARTING", SCREEN_WIDTH / 2, 214 + dy);
 
-  // Inisialisasi Kemajuan
+  // Initialize progress bar (thinner: 8px height, longer: 280px width,
+  // centered)
   _progress = 0;
-  // Gambar batang kosong awal atau hanya mulai dari 0
-  tft->fillRect(38, 198, _progress, 11, 0xFFFF);
+  int barX =
+      (SCREEN_WIDTH - 280) / 2; // Center the 280px bar: (480-280)/2 = 100px
+  tft->fillRect(barX, 198 + dy, _progress, 8, 0xFFFF);
 
   _lastUpdate = millis();
 }
 
 void SplashScreen::update() {
-  // Logika Animasi
-  // Lebar target adalah ~246 berdasarkan kode pengguna
-  if (_progress < 246) {
-    // Pembaruan non-pemblokiran setiap 10ms (lebih cepat dari 100ms untuk
-    // kelancaran)
+  int dx = (SCREEN_WIDTH - 320) / 2;
+  int dy = (SCREEN_HEIGHT - 240) / 2;
+
+  // Progress bar animation (thinner: 8px height, longer: 280px width, centered)
+  if (_progress < 280) {
     if (millis() - _lastUpdate > 10) {
-      _progress += 2; // Penambahan lebih cepat
+      _progress += 2;
 
       TFT_eSPI *tft = _ui->getTft();
-      tft->fillRect(38, 198, _progress, 11, 0xFFFF);
+      int barX = (SCREEN_WIDTH - 280) / 2; // Center the bar
+      tft->fillRect(barX, 198 + dy, _progress, 8, 0xFFFF);
 
       _lastUpdate = millis();
     }

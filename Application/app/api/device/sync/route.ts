@@ -40,7 +40,6 @@ export async function GET(request: Request) {
         const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
         const [username, password] = credentials.split(':');
 
-        // Simple validation (in production, check against database)
         if (!username || !password) {
             return NextResponse.json(
                 { error: 'Unauthorized - Invalid credentials' },
@@ -48,12 +47,39 @@ export async function GET(request: Request) {
             );
         }
 
-        // Validate specific credentials requested by user
-        if (username !== 'admin' || password !== '1111') {
-            return NextResponse.json(
-                { error: 'Unauthorized - Invalid username or password' },
-                { status: 401 }
-            );
+        // --- USER PERSISTENCE LOGIC ---
+        const fs = require('fs');
+        const path = require('path');
+        const usersFilePath = path.join(process.cwd(), 'data', 'users.json');
+
+        // Ensure data dir exists
+        const dataDir = path.join(process.cwd(), 'data');
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+        }
+
+        let users = [];
+        if (fs.existsSync(usersFilePath)) {
+            users = JSON.parse(fs.readFileSync(usersFilePath, 'utf8'));
+        }
+
+        let user = users.find((u: any) => u.username === username);
+
+        if (!user) {
+            // AUTO-REGISTER: Create new user if they don't exist
+            console.log(`Sync: Registering new user: ${username}`);
+            user = { username, password, name: username };
+            users.push(user);
+            fs.writeFileSync(usersFilePath, JSON.stringify(users, null, 2));
+        } else {
+            // VERIFY: Check password for existing user
+            if (user.password !== password) {
+                console.log(`Sync: Authentication failed for user: ${username}`);
+                return NextResponse.json(
+                    { error: 'Unauthorized - Invalid password' },
+                    { status: 401 }
+                );
+            }
         }
 
         // --- UPDATE STATUS FROM QUERY PARAMS ---
@@ -103,12 +129,26 @@ export async function POST(request: Request) {
     try {
         // Basic authentication check
         const authHeader = request.headers.get('authorization');
-
         if (!authHeader || !authHeader.startsWith('Basic ')) {
-            return NextResponse.json(
-                { error: 'Unauthorized - Missing credentials' },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const base64Credentials = authHeader.split(' ')[1];
+        const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
+        const [username, password] = credentials.split(':');
+
+        const fs = require('fs');
+        const path = require('path');
+        const usersFilePath = path.join(process.cwd(), 'data', 'users.json');
+
+        let users = [];
+        if (fs.existsSync(usersFilePath)) {
+            users = JSON.parse(fs.readFileSync(usersFilePath, 'utf8'));
+        }
+
+        const user = users.find((u: any) => u.username === username);
+        if (!user || user.password !== password) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const body = await request.json();

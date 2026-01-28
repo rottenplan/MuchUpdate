@@ -12,8 +12,8 @@ extern SessionManager sessionManager;
 #define LIST_ITEM_HEIGHT 30
 
 // Tentukan Area Tombol
-#define STOP_BTN_Y 200 // Dipindahkan KE BAWAH untuk jarak yang lebih baik
-#define STOP_BTN_H 35
+#define STOP_BTN_Y 255 // Dipindahkan KE BAWAH untuk jarak yang lebih baik
+#define STOP_BTN_H 55
 
 void LapTimerScreen::onShow() {
   _lastUpdate = 0;
@@ -283,12 +283,12 @@ void LapTimerScreen::update() {
       }
 
       // 2. Button Logic
-      // startY = 55, btnHeight = 35, gap = 8
-      int startY = 55;
-      int btnHeight = 35;
+      // startY = 60, btnHeight = 50, gap = 8
+      int startY = 60;
+      int btnHeight = 50;
       int gap = 8;
-      int x = (SCREEN_WIDTH - 240) / 2;
-      int btnWidth = 240;
+      int x = (SCREEN_WIDTH - 360) / 2;
+      int btnWidth = 360;
 
       // Check if X is within button width (centered)
       if (p.x > x && p.x < x + btnWidth) {
@@ -311,8 +311,8 @@ void LapTimerScreen::update() {
             // Second tap on SAME button -> Execute Action
 
             // Execute Action
-            if (touchedIdx == 0) {         // Select Track
-              if (!gpsManager.isFixed()) { // GPS CHECK ACTIVE
+            if (touchedIdx == 0) {                  // Select Track
+              if (false && !gpsManager.isFixed()) { // GPS CHECK DISABLED
                 _state = STATE_NO_GPS;
                 _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                         SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
@@ -377,16 +377,16 @@ void LapTimerScreen::update() {
       }
 
       if (_createStep == 0) {
-        // SET START Button (Centered, y=160, w=160, h=40)
-        int btnW = 160;
-        int btnH = 40;
+        // SET START Button (Centered, y=200, w=220, h=50)
+        int btnW = 220;
+        int btnH = 50;
         int btnX = (SCREEN_WIDTH - btnW) / 2;
-        int btnY = 160;
+        int btnY = 200;
 
         if (p.x > btnX && p.x < btnX + btnW && p.y > btnY &&
             p.y < btnY + btnH) {
           // Capture GPS
-          if (true || gpsManager.isFixed()) { // Allow simulation if needed
+          if (true) { // Allow simulation / BYPASS GPS
             _createStartLat = gpsManager.getLatitude();
             _createStartLon = gpsManager.getLongitude();
             _createStep = 1;
@@ -399,9 +399,9 @@ void LapTimerScreen::update() {
           }
         }
       } else if (_createStep == 1) {
-        int btnW = 140;
-        int btnH = 35;
-        int btnY = 160;
+        int btnW = 200;
+        int btnH = 50;
+        int btnY = 200;
 
         // Button 1: SAME AS START (Left)
         int btn1X = 10;
@@ -553,7 +553,7 @@ void LapTimerScreen::update() {
 
       // 3. Track Selection (Open Popup)
       int startY = 60;
-      int itemH = 45;
+      int itemH = 55;
       int gap = 8;
       if (p.y > startY) {
         int idx = (p.y - startY) / (itemH + gap);
@@ -662,11 +662,11 @@ void LapTimerScreen::update() {
       }
 
       // 2. Select Button
-      // x = (W - 140)/2, y=190, w=140, h=35
-      int btnW = 140;
+      // x = (W - 180)/2, y=240, w=180, h=45
+      int btnW = 180;
       int btnX = (SCREEN_WIDTH - btnW) / 2;
-      int btnY = 190;
-      int btnH = 35;
+      int btnY = 240;
+      int btnH = 45;
 
       if (p.x > btnX && p.x < btnX + btnW && p.y > btnY - 10 &&
           p.y < btnY + btnH + 10) {
@@ -691,8 +691,8 @@ void LapTimerScreen::update() {
       }
 
       // 3. Edit Name Button
-      // infoX = 165, infoY = 60 (updated), infoW = 145
-      int renameX = 165 + 145 - 50;
+      // infoX = 250, infoW = 220 -> x = 420
+      int renameX = 420;
       int renameY = 60 + 5;
       if (p.x > renameX && p.x < renameX + 45 && p.y > renameY &&
           p.y < renameY + 18) {
@@ -803,19 +803,18 @@ void LapTimerScreen::update() {
       int cardH = 40;
       int clearY = cardY + cardH + 5;
       int gridY = clearY + 10;
-      int boxH = 50;
-      int btnY = gridY + boxH + 20; // Y ~ 180
-      int btnH = 42;
+      int boxH = 70;
+      int btnY = 240;
+      int btnH = 55;
 
       if (_recordingState == RECORD_IDLE) {
         // START button (Centered)
-        // btnX ~ (320-140)/2 = 90. Width 140.
-        // Hit Area: X 90-230, Y 180-222
-        if (p.x > 80 && p.x < 240 && p.y > btnY - 10 &&
+        // Hit Area: X 150-330
+        if (p.x > 150 && p.x < 330 && p.y > btnY - 10 &&
             p.y < btnY + btnH + 10) {
 
-          if (true ||
-              (gpsManager.isFixed() && gpsManager.getSatellites() >= 6)) {
+          if (true) {
+            // BYPASS GPS CHECK for Recording
             // Logic... same as before
             if (_menuSelectionIdx == 10) {
               _menuSelectionIdx = -1;
@@ -840,8 +839,8 @@ void LapTimerScreen::update() {
           }
         }
       } else if (_recordingState == RECORD_ACTIVE) {
-        // STOP button (Centered, Same Pos)
-        if (p.x > 80 && p.x < 240 && p.y > btnY - 10 &&
+        // STOP button (Centered)
+        if (p.x > 150 && p.x < 330 && p.y > btnY - 10 &&
             p.y < btnY + btnH + 10) {
 
           if (_menuSelectionIdx == 11) {
@@ -856,51 +855,44 @@ void LapTimerScreen::update() {
       } else if (_recordingState == RECORD_COMPLETE) {
         // SAVE | DISCARD Buttons
         // btnW=100, gap=20.
-        // SaveX = (320 - 220)/2 = 50. Range 50-150.
-        // DelX = 50 + 100 + 20 = 170. Range 170-270.
+        // StartX = (480 - 220)/2 = 130.
+        // SaveX: 130 to 230
+        // DelX: 250 to 350
+        // Y position = gridY + boxH + 20 = 110 + 70 + 20 = 200.
+
+        int saveY = 200;
 
         // SAVE (Left)
-        if (p.x > 40 && p.x < 160 && p.y > btnY - 10 &&
-            p.y < btnY + btnH + 10) {
+        if (p.x > 130 && p.x < 230 && p.y > saveY && p.y < saveY + btnH) {
           if (_menuSelectionIdx == 12) {
-            _menuSelectionIdx = -1;
+            // ACTION: SAVE
             String filename = "/tracks/track_" + String(millis()) + ".gpx";
             saveTrackToGPX(filename);
-            _ui->showToast("Saved to SD Card!", 2000);
-            _finishLat = _recordStartLat;
-            _finishLon = _recordStartLon;
-            _finishSet = true;
-            _currentTrackName = "Recorded Track";
-            _state = STATE_RACING;
-            _lapCount = 0;
-            _bestLapTime = 0;
-            _lapTimes.clear();
-            _currentLapStart = millis();
-            _currentLapStart = millis();
-            // fillRect removed, handled by drawRacingStatic's fillScreen
+            _ui->showToast("Saved!", 2000);
 
-            drawRacingStatic();
-            drawRacing();
+            _state = STATE_TRACK_LIST; // Go to list to see new track
+            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                    _ui->getBackgroundColor());
+            drawTrackList();
+            _menuSelectionIdx = -1;
           } else {
             _menuSelectionIdx = 12;
             drawRecordTrack();
           }
-          return;
         }
-
         // DISCARD (Right)
-        if (p.x > 160 && p.x < 280 && p.y > btnY - 10 &&
-            p.y < btnY + btnH + 10) {
+        else if (p.x > 250 && p.x < 350 && p.y > saveY && p.y < saveY + btnH) {
           if (_menuSelectionIdx == 13) {
-            _menuSelectionIdx = -1;
+            // ACTION: DISCARD
             _recordingState = RECORD_IDLE;
             _recordedPoints.clear();
             drawRecordTrack();
+            _menuSelectionIdx = -1;
           } else {
             _menuSelectionIdx = 13;
             drawRecordTrack();
           }
-          return;
         }
       }
     }
@@ -976,7 +968,7 @@ void LapTimerScreen::update() {
         drawSummary();
         return;
       }
-      if (p.x > 80 && p.x < 240 && p.y > STOP_BTN_Y) {
+      if (p.x > 150 && p.x < 330 && p.y > STOP_BTN_Y) {
         _state = STATE_SUMMARY;
         if (sessionManager.isLogging()) {
           String dateStr =
@@ -1073,9 +1065,9 @@ void LapTimerScreen::drawMenu() {
   tft->drawString("<", 10, 25);
 
   // Buttons
-  int startY = 55;
-  int btnHeight = 35;
-  int btnWidth = 240;
+  int startY = 60;
+  int btnHeight = 50;
+  int btnWidth = 360;
   int gap = 8;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
@@ -1177,7 +1169,7 @@ void LapTimerScreen::drawTrackList() {
 
   // --- 2. LIST ---
   int startY = 60;
-  int itemH = 45; // Taller for card style
+  int itemH = 55; // Taller for card style
   int itemW = SCREEN_WIDTH - 20;
   int itemX = 10;
   int gap = 8;
@@ -1292,14 +1284,14 @@ void LapTimerScreen::drawTrackDetails() {
 
   // --- LAYOUT ---
   int mapX = 10;
-  int mapY = 60; // Shifted down a bit
-  int mapW = 145;
-  int mapH = 115;
+  int mapY = 60;
+  int mapW = 230;
+  int mapH = 160;
 
-  int infoX = 165;
+  int infoX = 250;
   int infoY = 60;
-  int infoW = 145;
-  int infoH = 115;
+  int infoW = 220;
+  int infoH = 160;
 
   // 1. MAP CARD
   tft->fillRoundRect(mapX, mapY, mapW, mapH, 8, 0x18E3); // Charcoal
@@ -1355,9 +1347,9 @@ void LapTimerScreen::drawTrackDetails() {
   tft->drawString(confBuf, infoX + 12, infoY + 100);
 
   // 3. ACTION BUTTONS
-  int btnY = 190;
-  int btnH = 35;
-  int btnW = 140;
+  int btnY = 240;
+  int btnH = 45;
+  int btnW = 180;
 
   // SELECT Button (Green/Slate) -> centered? Or split?
   // Let's put SELECT center-right, BACK center-left?
@@ -1486,6 +1478,7 @@ void LapTimerScreen::drawRecordTrack() {
     tft->setTextDatum(MR_DATUM);
     tft->setTextPadding(120);
     tft->setTextFont(2);
+    tft->setTextSize(1); // Ensure size is 1 to prevent glitch
     tft->drawString(statusText + " (" + String(sats) + ")", cardX + cardW - 10,
                     cardY + cardH / 2);
     tft->setTextPadding(0);
@@ -1503,7 +1496,7 @@ void LapTimerScreen::drawRecordTrack() {
     // Grid Layout for Metrics (Slate Boxes)
     int gridY = clearY + 10;
     int boxW = (SCREEN_WIDTH - 25) / 2;
-    int boxH = 50;
+    int boxH = 70;
     int box1X = 10;
     int box2X = 15 + boxW;
 
@@ -1533,10 +1526,10 @@ void LapTimerScreen::drawRecordTrack() {
       tft->drawString("TIME", box2X + 8, gridY + 5);
 
       // STOP Button below grid
-      int btnY = gridY + boxH + 20;
+      int btnY = 240;
 
       // STOP Button
-      int btnW = 140;
+      int btnW = 180;
       int btnX = (SCREEN_WIDTH - btnW) / 2;
       uint16_t btnColor = (_menuSelectionIdx == 11) ? 0x8000 : TFT_RED;
       uint16_t txtColor = TFT_WHITE;
@@ -1602,9 +1595,9 @@ void LapTimerScreen::drawRecordTrack() {
     bool ready = true; // BYPASS
 
     if (ready != lastReady || stateChanged) {
-      int btnW = 140;
+      int btnW = 180;
       int btnX = (SCREEN_WIDTH - btnW) / 2;
-      int btnY = gridY + 50;
+      int btnY = 240;
 
       if (ready) {
         uint16_t btnColor = (_menuSelectionIdx == 10) ? 0x05E0 : TFT_GREEN;
@@ -1637,6 +1630,7 @@ void LapTimerScreen::drawRecordTrack() {
     // Points Value (Left Box)
     tft->setTextColor(TFT_SKYBLUE, 0x10A2);
     tft->setTextFont(4);
+    tft->setTextSize(1); // Ensure size 1
     tft->setTextDatum(MC_DATUM);
     tft->setTextPadding(boxW - 10);
     tft->drawNumber(_recordedPoints.size(), box1X + boxW / 2, gridY + 28);
@@ -2056,6 +2050,7 @@ void LapTimerScreen::drawRacing() {
 
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
   tft->setTextFont(6);
+  tft->setTextSize(1);
   tft->setTextDatum(MC_DATUM);
   tft->setTextPadding(timeAreaW);
   tft->drawString(timeBuf, timeCenterX, timeY);
@@ -2071,6 +2066,7 @@ void LapTimerScreen::drawRacing() {
     // Background is charcoal (same as box)
     tft->setTextColor(TFT_GOLD, 0x18E3);
     tft->setTextFont(2);
+    tft->setTextSize(1);
     tft->setTextDatum(MR_DATUM);
     // Right Align inside box
     tft->setTextPadding(40);
@@ -2119,6 +2115,7 @@ void LapTimerScreen::drawRacing() {
     }
     tft->setTextColor(TFT_GOLD, cardBg);
     tft->setTextFont(4);
+    tft->setTextSize(1);
     tft->setTextDatum(MC_DATUM);
     tft->setTextPadding(cardW - 10);
     tft->drawString(text, 10 + 1.5 * cardW, gridY + valOffsetY);
@@ -2154,6 +2151,7 @@ void LapTimerScreen::drawRacing() {
   if (abs(speed - _lastSpeed) > 0.5) {
     tft->setTextColor(TFT_CYAN, cardBg);
     tft->setTextFont(6);
+    tft->setTextSize(1);
     tft->setTextDatum(MC_DATUM);
     tft->setTextPadding(cardW - 10);
     tft->drawFloat(speed, 1, 5 + cardW / 2, row2Y + valOffsetY);
@@ -2397,14 +2395,17 @@ void LapTimerScreen::drawCreateTrack() {
   tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
 
-  // Divider
-  tft->drawFastHLine(0, 50, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Divider - REMOVED per user request
+  // tft->drawFastHLine(0, 50, SCREEN_WIDTH, COLOR_SECONDARY);
+
+  // Status Bar Separator Line (Restored)
+  tft->drawFastHLine(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, COLOR_SECONDARY);
 
   // Title Box
-  int headW = 140;
-  int headH = 28;
+  int headW = 200;
+  int headH = 35;
   int headX = (SCREEN_WIDTH - headW) / 2;
-  int headY = 18;
+  int headY = STATUS_BAR_HEIGHT + 15; // Below Status Bar (20 + 15 = 35)
   tft->fillRoundRect(headX, headY, headW, headH, 6, 0x10A2); // Slate
   tft->drawRoundRect(headX, headY, headW, headH, 6, TFT_SILVER);
 
@@ -2422,7 +2423,7 @@ void LapTimerScreen::drawCreateTrack() {
   tft->drawString("<", 10, 25);
 
   // 2. Content (Shifted down)
-  int midY = 100;
+  int midY = 120;
   tft->setTextDatum(MC_DATUM);
   tft->setTextFont(1);
   tft->setTextColor(TFT_SILVER, TFT_BLACK);
@@ -2432,7 +2433,8 @@ void LapTimerScreen::drawCreateTrack() {
   bool fixed = gpsManager.isFixed();
 
   if (_createStep == 0) {
-    tft->drawString("STEP 1: START LINE", SCREEN_WIDTH / 2, 50);
+    tft->drawString("STEP 1: START LINE", SCREEN_WIDTH / 2,
+                    90); // Moved down from 50
     tft->setTextFont(2);
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->drawString("Go to Start Line", SCREEN_WIDTH / 2, midY);
@@ -2444,10 +2446,10 @@ void LapTimerScreen::drawCreateTrack() {
     tft->drawString(coord, SCREEN_WIDTH / 2, midY + 30);
 
     // Button: SET START
-    int btnW = 160;
-    int btnH = 40;
+    int btnW = 220; // Bigger
+    int btnH = 50;
     int btnX = (SCREEN_WIDTH - btnW) / 2;
-    int btnY = 160;
+    int btnY = 200; // Lower
 
     uint16_t btnColor = fixed ? TFT_GREEN : TFT_DARKGREY;
     tft->fillRoundRect(btnX, btnY, btnW, btnH, 6, btnColor);
@@ -2456,7 +2458,8 @@ void LapTimerScreen::drawCreateTrack() {
     tft->drawString("SET START", btnX + btnW / 2, btnY + btnH / 2 + 1);
 
   } else if (_createStep == 1) {
-    tft->drawString("STEP 2: FINISH LINE", SCREEN_WIDTH / 2, 50);
+    tft->drawString("STEP 2: FINISH LINE", SCREEN_WIDTH / 2,
+                    90); // Moved down from 50
     tft->setTextFont(2);
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->drawString("Go to Finish Line", SCREEN_WIDTH / 2, midY);
@@ -2467,19 +2470,19 @@ void LapTimerScreen::drawCreateTrack() {
     String coord = String(lat, 6) + ", " + String(lon, 6);
     tft->drawString(coord, SCREEN_WIDTH / 2, midY + 30);
 
-    int btnW = 140;
-    int btnH = 35;
+    int btnW = 200; // Bigger buttons
+    int btnH = 50;
 
     // Button 1: SAME AS START
-    int btn1X = 10;
-    int btnY = 160;
+    int btn1X = 20;
+    int btnY = 200; // Lower
     tft->fillRoundRect(btn1X, btnY, btnW, btnH, 6, TFT_CYAN);
     tft->setTextColor(TFT_BLACK, TFT_CYAN);
     tft->setTextFont(2);
     tft->drawString("SAME AS START", btn1X + btnW / 2, btnY + btnH / 2 + 1);
 
     // Button 2: SET FINISH
-    int btn2X = SCREEN_WIDTH - 10 - btnW;
+    int btn2X = SCREEN_WIDTH - 20 - btnW;
     uint16_t btnColor = fixed ? TFT_GREEN : TFT_DARKGREY;
     tft->fillRoundRect(btn2X, btnY, btnW, btnH, 6, btnColor);
     tft->setTextColor(TFT_BLACK, btnColor);

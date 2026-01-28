@@ -91,6 +91,11 @@ void SettingsScreen::loadSettings() {
         _prefs.getInt("brightness", 9); // Default 100%
     _settings.push_back(brightness);
 
+    // Debug Touch Toggle
+    SettingItem debugTouch = {"DEBUG TOUCH", TYPE_TOGGLE, "debug_touch"};
+    debugTouch.checkState = _prefs.getBool("debug_touch", false);
+    _settings.push_back(debugTouch);
+
     _prefs.end();
 
     // GPS Status Sub-menu REMOVED
@@ -459,6 +464,10 @@ void SettingsScreen::saveSetting(int idx) {
     if (item.key == "theme") {
       // _ui->setDarkMode(item.checkState);
       // _prefs.putBool("dark_mode", item.checkState);
+    }
+
+    if (item.key == "debug_touch") {
+      _ui->setDebugTouch(item.checkState);
     }
 
     _prefs.putBool(item.key.c_str(), item.checkState);

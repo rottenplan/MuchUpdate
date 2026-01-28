@@ -21,8 +21,8 @@
 #define TOUCH_INT 21
 #define TOUCH_RST 25
 // Native Resolution (Portrait)
-#define TOUCH_WIDTH 240
-#define TOUCH_HEIGHT 320
+#define TOUCH_WIDTH 320
+#define TOUCH_HEIGHT 480
 
 // Touch Calibration / Mapping
 // Common for Landscape on this board: Swap XY=true, Invert Y=true
@@ -43,7 +43,7 @@
 // #define PIN_RGB_BLUE 17  // Disabled: Used for GPS_RX
 // #define PIN_LIGHT_SENSOR 34
 // #define PIN_SPEAKER 26
-#define PIN_RPM_INPUT 34 // Moved to 34 to free up 35 for Battery
+#define PIN_RPM_INPUT 35 // User requested 35
 
 // GPS / UART
 // Standard Serial Pins (Conflict with USB Debugging!)
@@ -51,7 +51,7 @@
 #define PIN_GPS_TX 1
 #define GPS_BAUD 115200 // Increased from 9600 for faster GPS lock
 // #define PIN_LIGHT_SENSOR 34 // Removed: Used for Battery
-#define PIN_BATTERY 34
+// #define PIN_BATTERY 35 // Disabled by user request
 #define BATTERY_VOLTAGE_MAX 4.2
 #define BATTERY_VOLTAGE_MIN 3.0 // Lowered to 3.0V to capture lower range
 
@@ -59,8 +59,8 @@
 // SYSTEM CONSTANTS
 // ==========================================
 // Landscape Mode
-#define SCREEN_WIDTH 320
-#define SCREEN_HEIGHT 240
+#define SCREEN_WIDTH 480
+#define SCREEN_HEIGHT 320
 #define STATUS_BAR_HEIGHT 20 // Fixed height for status bar
 
 #define SERIAL_DEBUG_BAUD 115200
@@ -76,17 +76,29 @@
 // ==========================================
 // UI FONT CONFIGURATION
 // ==========================================
-// Font Sizes (1=Tiny, 2=Small, 3=Medium, 4=Large, 6=Huge)
-#define FONT_SIZE_STATUS_BAR 1
-#define FONT_SIZE_SPLASH_TEXT 1 // "ENGINE STARTING"
-#define FONT_SIZE_MENU_TITLE 3
-#define FONT_SIZE_MENU_ITEM 3
-#define FONT_SIZE_LAP_SPEED 6 // Main Racing Speed
-#define FONT_SIZE_LAP_TIME 2  // Current Lap Time
-#define FONT_SIZE_LAP_LIST 2  // History List Text
-#define FONT_SIZE_LAP_BEST 3  // Best Lap Time Display
+// Font Sizes (1=Tiny, 2=Small, 3=Medium, 4=Large, 6=Huge, 7=Massive)
+// Optimized for 480x320 display
+#define FONT_SIZE_STATUS_BAR 2  // Increased from 1 for better visibility
+#define FONT_SIZE_SPLASH_TEXT 1 // Reduced to 1 for smaller text
+
+// Menu & Navigation
+#define FONT_SIZE_MENU_TITLE 4 // Increased from 3 for prominence
+#define FONT_SIZE_MENU_ITEM 4  // Increased from 3 for better readability
+
+// Speedometer & Racing
+#define FONT_SIZE_LAP_SPEED 7 // Increased from 6 for main display
+#define FONT_SIZE_LAP_TIME 3  // Increased from 2
+#define FONT_SIZE_LAP_LIST 2  // Kept at 2 (fits more items)
+#define FONT_SIZE_LAP_BEST 4  // Increased from 3
+
+// General UI Elements
+#define FONT_SIZE_HEADER 3 // Increased from 2
+#define FONT_SIZE_BUTTON 3 // Increased from 2
+#define FONT_SIZE_BODY 2   // Increased from 1
+#define FONT_SIZE_LABEL 2  // Increased from 1
+#define FONT_SIZE_VALUE 3  // Increased from 2
 
 // API Configuration
-#define API_URL "http://192.168.2.66:3000/api/device/sync"
+#define API_URL "http://192.168.100.67:3000/api/device/sync"
 
 #endif

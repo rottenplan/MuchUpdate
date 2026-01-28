@@ -20,8 +20,8 @@ private:
   void updateValues();
 
   // Constants
-  static const int GRAPH_WIDTH = 298;
-  static const int GRAPH_HEIGHT = 85;
+  static const int GRAPH_WIDTH = 450;
+  static const int GRAPH_HEIGHT = 154;
   const int MAX_SPEED_SCALE = 150; // Max speed for graph scaling (km/h)
 
   TFT_eSprite *_graphSprite = nullptr;

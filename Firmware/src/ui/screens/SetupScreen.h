@@ -66,7 +66,7 @@ private:
   void drawTextField(const char *label, String value, int y, bool isActive,
                      bool isPassword = false);
   void drawButton(const char *label, int x, int y, int w, int h,
-                  bool isHighlighted = false);
+                  bool isHighlighted = false, int fontSize = 2);
 
   // Input methods
   void handleWelcomeTouch(int x, int y);

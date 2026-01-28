@@ -78,6 +78,10 @@ public:
   uint16_t getTextColor();
   uint16_t getSecondaryColor();
 
+  // Debug Touch
+  void setDebugTouch(bool enable) { _debugTouchEnabled = enable; }
+  bool isDebugTouchEnabled() { return _debugTouchEnabled; }
+
 private:
   TFT_eSPI *_tft;
   TAMC_GT911 *_touch; // Added touch pointer
@@ -124,6 +128,9 @@ private:
   unsigned long _lastTapTime;
   bool _wasTouched;
   unsigned long _lastTouchProcessedTime; // Added for debounce
+
+  // Debug
+  bool _debugTouchEnabled;
 };
 
 #endif

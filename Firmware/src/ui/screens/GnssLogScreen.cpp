@@ -30,16 +30,16 @@ void GnssLogScreen::onShow() {
   tft->drawString("GPS LOG", SCREEN_WIDTH / 2, 28);
 
   // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
 
   // --- 2. CHECKBOXES (Top area) ---
   drawCheckboxes();
 
   // --- 3. LOG CARD ---
-  // Y=95, H=110 (Restored Height)
-  // Width Shrunk: W=240 (Centered: X=40)
-  tft->fillRoundRect(40, 95, 240, 110, 8, 0x18E3);
-  tft->drawRoundRect(40, 95, 240, 110, 8, TFT_DARKGREY);
+  // Widened for 480x320: W=440 (Centered: X=20)
+  tft->fillRoundRect(20, 95, 440, 180, 8, 0x18E3);
+  tft->drawRoundRect(20, 95, 440, 180, 8, TFT_DARKGREY);
 
   // Register Callback
   gpsManager.setRawDataCallback([this](uint8_t c) {
@@ -48,12 +48,12 @@ void GnssLogScreen::onShow() {
 
     if (c == '\n' || c == '\r') {
       if (_buffer.length() > 0) {
-        // Truncate to fit new box width (240px -> ~32 chars)
-        if (_buffer.length() > 32) {
-          _buffer = _buffer.substring(0, 32);
+        // Truncate to fit new box width (440px -> ~60 chars)
+        if (_buffer.length() > 60) {
+          _buffer = _buffer.substring(0, 60);
         }
         _lines.push_back(_buffer);
-        if (_lines.size() > 8) // Max 8 lines for H=110
+        if (_lines.size() > 14) // Max 14 lines for H=180
           _lines.erase(_lines.begin());
         _buffer = "";
         _needsRedraw = true; // Trigger redraw
@@ -103,11 +103,11 @@ void GnssLogScreen::drawCheckboxes() {
   bool checkSBAS = (m == 0 || m == 1 || m == 2 || m == 3 || m == 4 || m == 6);
   bool checkGAL = (m == 0 || m == 2 || m == 3);
 
-  // Spacing: 10, 90, 170, 250
-  drawCheckItem(20, "GNSS", checkGPS);
-  drawCheckItem(100, "UBLOX", checkGLO);
-  drawCheckItem(180, "SBAS", checkSBAS);
-  drawCheckItem(260, "GAL", checkGAL);
+  // Spacing: Spread across 480px
+  drawCheckItem(20, "GPS+", checkGPS);
+  drawCheckItem(130, "GLONASS", checkGLO);
+  drawCheckItem(260, "SBAS", checkSBAS);
+  drawCheckItem(370, "GALILEO", checkGAL);
 }
 
 void GnssLogScreen::update() {
@@ -127,9 +127,8 @@ void GnssLogScreen::update() {
       return;
     }
 
-    // Toggle Pause (Tap on log area or Toggle Button?)
-    // Area: Y 95 - 205
-    if (p.x > 40 && p.x < 280 && p.y > 90 && p.y < 210) {
+    // Toggle Pause (Tap on log area)
+    if (p.x > 20 && p.x < 460 && p.y > 90 && p.y < 280) {
       _paused = !_paused;
       _needsRedraw = true;
     }
@@ -145,13 +144,13 @@ void GnssLogScreen::update() {
     bool sbas = (m == 0 || m == 1 || m == 2 || m == 3 || m == 4 || m == 6);
     bool gal = (m == 0 || m == 2 || m == 3);
 
-    if (tapX > 10 && tapX < 80) { // GNSS Area
-                                  // GNSS always on
-    } else if (tapX > 90 && tapX < 160) {
+    if (tapX > 10 && tapX < 120) { // GPS Area
+      // GNSS always on
+    } else if (tapX > 130 && tapX < 250) {
       glo = !glo;
-    } else if (tapX > 170 && tapX < 240) {
+    } else if (tapX > 260 && tapX < 360) {
       sbas = !sbas;
-    } else if (tapX > 250 && tapX < 320) {
+    } else if (tapX > 370 && tapX < 480) {
       gal = !gal;
     }
 
@@ -195,10 +194,10 @@ void GnssLogScreen::update() {
     // Draw status at top right, aligned with checks Y=35
     if (connected) {
       tft->setTextColor(TFT_GREEN, TFT_BLACK);
-      tft->drawString("GPS: CONNECTED  ", 310, 35);
+      tft->drawString("GPS: CONNECTED  ", SCREEN_WIDTH - 10, 35);
     } else {
       tft->setTextColor(TFT_RED, TFT_BLACK);
-      tft->drawString("GPS: NO DATA    ", 310, 35);
+      tft->drawString("GPS: NO DATA    ", SCREEN_WIDTH - 10, 35);
     }
   }
 
@@ -221,11 +220,11 @@ void GnssLogScreen::drawLines() {
   // Green text for logs
   tft->setTextColor(TFT_GREEN, 0x18E3);
   tft->setTextDatum(TL_DATUM);
-  tft->setTextPadding(220); // Width reduced to avoid overwriting right border
+  tft->setTextPadding(420); // Widened
 
-  // Margin 10px from X=40 -> X=50. Y=105.
-  int innerX = 50;
-  int innerY = 105;
+  // Margin 10px from X=20 -> X=30. Y=100.
+  int innerX = 30;
+  int innerY = 100;
 
   int y = innerY;
   for (const auto &line : _lines) {

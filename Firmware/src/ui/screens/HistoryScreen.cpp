@@ -32,11 +32,11 @@ void HistoryScreen::onShow() {
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
+  tft->setTextSize(FONT_SIZE_MENU_TITLE);
   tft->drawString("HISTORY", SCREEN_WIDTH / 2, 28);
 
-  // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  // Back Button (Blue Triangle) - Bottom Left (Moved down for 320h)
+  tft->fillTriangle(10, 290, 22, 284, 22, 296, TFT_BLUE);
 
   drawMenu();
 }
@@ -85,7 +85,7 @@ void HistoryScreen::update() {
             _scrollOffset--;
             drawGroups(_scrollOffset);
             _lastTouchY = p.y;
-          } else if (dy < 0 && _scrollOffset < (int)_groups.size() - 5) {
+          } else if (dy < 0 && _scrollOffset < (int)_groups.size() - 7) {
             _scrollOffset++;
             drawGroups(_scrollOffset);
             _lastTouchY = p.y;
@@ -102,7 +102,7 @@ void HistoryScreen::update() {
               filteredCount++;
           }
         }
-        int maxScroll = filteredCount - 5;
+        int maxScroll = filteredCount - 8;
 
         if (abs(dy) > 5) {
           if (dy > 0 && _scrollOffset > 0) {
@@ -120,6 +120,10 @@ void HistoryScreen::update() {
           int itemH = 25;
           if (p.y > listY) {
             int visIdx = (p.y - listY) / itemH;
+
+            // Limit to visible items count (9 for list)
+            if (visIdx >= 9)
+              visIdx = 8;
             int clickedIdx = visIdx + _scrollOffset;
 
             // Bounds check against filtered count
@@ -405,8 +409,8 @@ void HistoryScreen::scanHistory() {
 void HistoryScreen::drawMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Clear Content Area (Below Header line Y=20, down to footer Y=210)
-  tft->fillRect(0, 50, SCREEN_WIDTH, 160, TFT_BLACK);
+  // Clear Content Area (Below Header line Y=20, down to footer Y=280)
+  tft->fillRect(0, 50, SCREEN_WIDTH, 230, TFT_BLACK);
 
   tft->setTextDatum(MC_DATUM);
   tft->setFreeFont(&Org_01);
@@ -414,10 +418,10 @@ void HistoryScreen::drawMenu() {
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
 
   // Menu Options (Drag / Lap)
-  int startY = 60;
-  int btnHeight = 45;
-  int gap = 15;
-  int btnWidth = 240;
+  int startY = 80;
+  int btnHeight = 60;
+  int gap = 20;
+  int btnWidth = 360;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   const char *items[] = {"TRACK HISTORY", "DRAG HISTORY"};
@@ -450,7 +454,7 @@ void HistoryScreen::drawGroups(int scrollOffset) {
   int skip = 0;
 
   for (int i = 0; i < _groups.size(); i++) {
-    if (count >= 5)
+    if (count >= 7) // Show 7 groups
       break;
     if (skip < scrollOffset) {
       skip++;
@@ -541,7 +545,7 @@ void HistoryScreen::drawList(int scrollOffset) {
     currentGroupIdx++;
 
     // Pagination
-    if (count >= 6) { // Show 6 items
+    if (count >= 8) { // Show 8 items
       continue; // Don't break, need to continue logic if we want total? No we
                 // calculated total.
                 // break;
@@ -551,7 +555,7 @@ void HistoryScreen::drawList(int scrollOffset) {
       skip++;
       continue;
     }
-    if (count >= 6)
+    if (count >= 8)
       break; // Optimization
 
     // Draw Item
@@ -698,7 +702,7 @@ void HistoryScreen::drawOptions() {
   }
 
   // Back Triangle
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  tft->fillTriangle(10, 290, 22, 284, 22, 296, TFT_BLUE);
 }
 
 void HistoryScreen::drawViewData() {
@@ -762,13 +766,13 @@ void HistoryScreen::drawViewData() {
 
   if (isDrag) {
     // DRAG DISPLAY
-    // Use Grid 4 boxes for Splits
-    int boxW = (SCREEN_WIDTH - 25) / 2;
-    int boxH = 50;
-    int gap = 5;
+    // Use Grid 4 boxes for Splits - Optimized for 480x320
+    int boxW = (SCREEN_WIDTH - 30) / 2;
+    int boxH = 70;
+    int gap = 10;
 
     // 0-60
-    tft->fillRoundRect(10, startY, boxW, boxH, 5, 0x18E3);
+    tft->fillRoundRect(10, startY, boxW, boxH, 8, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
     tft->drawString("0-60 KPH", 15, startY + 5);
@@ -778,7 +782,7 @@ void HistoryScreen::drawViewData() {
     tft->drawString(analysis.time0to60 > 0
                         ? String(analysis.time0to60 / 1000.0, 2) + "s"
                         : "--",
-                    10 + boxW / 2, startY + 30);
+                    10 + boxW / 2, startY + 40);
 
     // 0-100
     tft->fillRoundRect(15 + boxW, startY, boxW, boxH, 5, 0x18E3);
@@ -823,10 +827,10 @@ void HistoryScreen::drawViewData() {
 
   if (_viewPage == 0) {
     // SUMMARY PAGE
-    // 4 Grid Box
-    int boxW = (SCREEN_WIDTH - 25) / 2;
-    int boxH = 50;
-    int gap = 5;
+    // 4 Grid Box - Optimized for 480x320
+    int boxW = (SCREEN_WIDTH - 30) / 2;
+    int boxH = 70;
+    int gap = 10;
 
     // Box 1: Total Time
     tft->fillRoundRect(10, startY, boxW, boxH, 5, 0x18E3);
@@ -846,8 +850,8 @@ void HistoryScreen::drawViewData() {
     sprintf(buf, "%02d:%02d:%02d", h, m, s);
     tft->setTextColor(TFT_WHITE, 0x18E3);
     tft->setTextDatum(MC_DATUM);
-    tft->setTextFont(2); // Reduced from 4 to 2 to prevent overflow
-    tft->drawString(buf, 10 + boxW / 2, startY + 30);
+    tft->setTextFont(4);
+    tft->drawString(buf, 10 + boxW / 2, startY + 40);
 
     // Box 2: Valid Laps (Count)
     tft->fillRoundRect(15 + boxW, startY, boxW, boxH, 5, 0x18E3);
@@ -858,32 +862,34 @@ void HistoryScreen::drawViewData() {
     tft->setTextDatum(MC_DATUM);
     tft->setTextFont(4);
     tft->drawString(String(analysis.validLaps), 15 + boxW + boxW / 2,
-                    startY + 30);
+                    startY + 40);
 
     // Row 2
     int Y2 = startY + boxH + gap;
 
     // Box 3: Distance
-    tft->fillRoundRect(10, Y2, boxW, boxH, 5, 0x18E3);
+    tft->fillRoundRect(10, Y2, boxW, boxH, 8, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
     tft->drawString("DISTANCE (km)", 15, Y2 + 5);
     tft->setTextColor(TFT_ORANGE, 0x18E3);
     tft->setTextDatum(MC_DATUM);
-    tft->drawFloat(analysis.totalDistance, 2, 10 + boxW / 2, Y2 + 30);
+    tft->setTextFont(4);
+    tft->drawFloat(analysis.totalDistance, 2, 10 + boxW / 2, Y2 + 40);
 
     // Box 4: Max Speed
-    tft->fillRoundRect(15 + boxW, Y2, boxW, boxH, 5, 0x18E3);
+    tft->fillRoundRect(15 + boxW, Y2, boxW, boxH, 8, 0x18E3);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
     tft->drawString("MAX SPEED", 20 + boxW, Y2 + 5);
     tft->setTextColor(TFT_RED, 0x18E3);
     tft->setTextDatum(MC_DATUM);
-    tft->drawFloat(analysis.maxSpeed, 1, 15 + boxW + boxW / 2, Y2 + 30);
+    tft->setTextFont(4);
+    tft->drawFloat(analysis.maxSpeed, 1, 15 + boxW + boxW / 2, Y2 + 40);
 
     // Best Lap Highlight
     int Y3 = Y2 + boxH + 10;
-    tft->drawRect(10, Y3, SCREEN_WIDTH - 20, 50, TFT_DARKGREY);
+    tft->drawRect(10, Y3, SCREEN_WIDTH - 20, 60, TFT_DARKGREY);
     tft->setTextColor(TFT_GOLD, TFT_BLACK);
     tft->setTextDatum(MC_DATUM);
     if (analysis.bestLap > 0) {
@@ -892,7 +898,8 @@ void HistoryScreen::drawViewData() {
       int bm = (b / 60000);
       int bms = b % 1000;
       sprintf(buf, "BEST: %d:%02d.%02d", bm, bs, bms / 10);
-      tft->drawString(buf, SCREEN_WIDTH / 2, Y3 + 25);
+      tft->setTextFont(4);
+      tft->drawString(buf, SCREEN_WIDTH / 2, Y3 + 30);
     } else {
       tft->drawString("NO LAP DATA", SCREEN_WIDTH / 2, Y3 + 25);
     }
@@ -910,8 +917,8 @@ void HistoryScreen::drawViewData() {
       int y = startY + 25;
       int count = 0;
       for (unsigned long t : analysis.lapTimes) {
-        if (count > 5)
-          break; // Show max 6
+        if (count > 9)
+          break; // Show max 10
         int ms = t % 1000;
         int s = (t / 1000) % 60;
         int m = (t / 60000);
@@ -932,7 +939,7 @@ void HistoryScreen::drawViewData() {
     // SECTOR ANALYSIS
     tft->setTextDatum(TL_DATUM);
     tft->setTextColor(TFT_SILVER, TFT_BLACK);
-    tft->drawString("LAP  S1    S2    S3    TOTAL", 15, startY, 2);
+    tft->drawString("LAP    S1      S2      S3     TOTAL", 20, startY, 2);
     tft->drawFastHLine(10, startY + 18, SCREEN_WIDTH - 20, TFT_DARKGREY);
 
     unsigned long bestS1 = 0, bestS2 = 0, bestS3 = 0;
@@ -947,7 +954,7 @@ void HistoryScreen::drawViewData() {
         bestS3 = s;
 
     int y = startY + 25;
-    for (int i = 0; i < (int)analysis.lapTimes.size() && i < 5; i++) {
+    for (int i = 0; i < (int)analysis.lapTimes.size() && i < 8; i++) {
       char buf[64];
       unsigned long s1 =
           (i < analysis.sector1.size()) ? analysis.sector1[i] : 0;
@@ -957,32 +964,32 @@ void HistoryScreen::drawViewData() {
           (i < analysis.sector3.size()) ? analysis.sector3[i] : 0;
       unsigned long tot = analysis.lapTimes[i];
 
-      tft->setTextColor(TFT_WHITE, TFT_BLACK);
-      // Columnar display
+      // Columnar display - Optimized for 480px width
       sprintf(buf, "%d", i + 1);
-      tft->drawString(buf, 15, y, 2);
+      tft->drawString(buf, 20, y, 2);
 
-      sprintf(buf, "%.1fs", s1 / 1000.0);
+      sprintf(buf, "%.2fs", s1 / 1000.0);
       tft->setTextColor((s1 == bestS1 && s1 > 0) ? TFT_GREEN : TFT_WHITE,
                         TFT_BLACK);
-      tft->drawString(buf, 55, y, 2);
+      tft->drawString(buf, 80, y, 2);
 
-      sprintf(buf, "%.1fs", s2 / 1000.0);
+      sprintf(buf, "%.2fs", s2 / 1000.0);
       tft->setTextColor((s2 == bestS2 && s2 > 0) ? TFT_GREEN : TFT_WHITE,
                         TFT_BLACK);
-      tft->drawString(buf, 105, y, 2);
+      tft->drawString(buf, 170, y, 2);
 
-      sprintf(buf, "%.1fs", s3 / 1000.0);
+      sprintf(buf, "%.2fs", s3 / 1000.0);
       tft->setTextColor((s3 == bestS3 && s3 > 0) ? TFT_GREEN : TFT_WHITE,
                         TFT_BLACK);
-      tft->drawString(buf, 155, y, 2);
+      tft->drawString(buf, 260, y, 2);
 
-      sprintf(buf, "%d:%02d", (int)(tot / 60000), (int)((tot / 1000) % 60));
+      sprintf(buf, "%d:%02d.%02d", (int)(tot / 60000), (int)((tot / 1000) % 60),
+              (int)((tot % 1000) / 10));
       tft->setTextColor((tot == analysis.bestLap) ? TFT_GOLD : TFT_WHITE,
                         TFT_BLACK);
-      tft->drawString(buf, 205, y, 2);
+      tft->drawString(buf, 350, y, 2);
 
-      y += 20;
+      y += 26;
     }
 
     // Theo Best
@@ -993,7 +1000,7 @@ void HistoryScreen::drawViewData() {
               (int)((theo / 1000) % 60), (int)((theo % 1000) / 100));
       tft->setTextColor(TFT_GOLD, TFT_BLACK);
       tft->setTextDatum(BC_DATUM);
-      tft->drawString(buf, SCREEN_WIDTH / 2, 210, 2);
+      tft->drawString(buf, SCREEN_WIDTH / 2, 285, 2);
     }
   } else if (_viewPage == 3) {
     // MAP PLACEHOLDER

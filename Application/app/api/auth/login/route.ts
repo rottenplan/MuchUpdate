@@ -5,43 +5,28 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { email, password } = body;
 
-    // TODO: Connect to real database
-    // For now, simple mock authentication
-    // Check for Admin (matches Device Sync)
-    if (email === 'admin' && password === '1111') {
-      return NextResponse.json({
-        success: true,
-        token: 'admin_token_' + Date.now(),
-        user: {
-          id: 999,
-          name: 'Admin User',
-          email: 'admin'
-        }
-      });
+    // --- USER PERSISTENCE LOGIC ---
+    const fs = require('fs');
+    const path = require('path');
+    const usersFilePath = path.join(process.cwd(), 'data', 'users.json');
+
+    let users = [];
+    if (fs.existsSync(usersFilePath)) {
+      users = JSON.parse(fs.readFileSync(usersFilePath, 'utf8'));
     }
 
-    // Default Demo User
-    if (email === 'user@example.com' && password === 'password123') {
-      return NextResponse.json({
-        success: true,
-        token: 'mock_jwt_token_1234567890',
-        user: {
-          id: 1,
-          name: 'Demo User',
-          email: 'user@example.com'
-        }
-      });
-    }
+    const user = users.find((u: any) =>
+      (u.username === email || u.email === email) && u.password === password
+    );
 
-    // Allow any "valid-looking" login for testing purposes if not specific mock
-    if (password && password.length >= 6) {
+    if (user) {
       return NextResponse.json({
         success: true,
-        token: 'mock_jwt_token_' + Date.now(),
+        token: 'auth_token_' + Date.now(),
         user: {
-          id: Math.floor(Math.random() * 1000),
-          name: 'Test User',
-          email: email
+          id: user.id || 1,
+          name: user.name || user.username,
+          email: user.email || user.username
         }
       });
     }

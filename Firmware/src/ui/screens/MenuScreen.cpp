@@ -31,7 +31,7 @@ void MenuScreen::onShow() {
   tft->setFreeFont(&Org_01);
   tft->setTextSize(FONT_SIZE_MENU_TITLE);
   tft->setTextColor(COLOR_ACCENT);
-  tft->drawString("MAIN MENU", SCREEN_WIDTH / 2, 45);
+  tft->drawString("MAIN MENU", SCREEN_WIDTH / 2, 38);
 
   drawMenu(true);
 }
@@ -40,12 +40,13 @@ void MenuScreen::update() {
   bool enter = false;
   UIManager::TouchPoint p = _ui->getTouchPoint();
 
-  // Layout Constants
-  int startY = 80;
-  int gap = 38;
-  int itemHeight = 30;
+  // Layout Constants for 480x320
+  int startY = 75;     // Start below title
+  int gap = 50;        // Gap between items
+  int itemHeight = 42; // Button height
 
   if (p.x != -1) { // Touched
+
     if (_touchStartY == -1) {
       _touchStartY = p.y;
     } else {
@@ -99,8 +100,8 @@ void MenuScreen::update() {
       // 1. Check Navigation Arrow (Bottom Center)
       int maxPage = (MENU_ITEMS - 1) / ITEMS_PER_PAGE;
 
-      // Toggle Button Area (Y > 210)
-      if (p.y > 210) {
+      // Toggle Button Area (Y > 280, below last menu item area)
+      if (p.y > 280) {
         if (millis() - lastPageSwitch > 150) {
           if (_currentPage < maxPage) {
             _currentPage++; // Go Down/Next
@@ -116,11 +117,13 @@ void MenuScreen::update() {
       // Removed Top Arrow Logic as we now use a single toggle button at the
       // bottom
 
-      // 2. Item Tap Detection
+      // 2. Item Tap Detection - Expanded hit areas (50px gap)
       int localIndex = -1;
       for (int i = 0; i < ITEMS_PER_PAGE; i++) {
-        int yTop = startY + (i * gap) - 5;
-        int yBot = yTop + itemHeight;
+        int yTop = startY + (i * gap);
+        int yBot =
+            yTop +
+            gap; // Changed from itemHeight to gap (50px) to remove dead zones
         if (p.y >= yTop && p.y <= yBot) {
           localIndex = i;
           break;
@@ -198,10 +201,11 @@ void MenuScreen::drawMenu(bool force) {
 
   tft->setTextSize(FONT_SIZE_MENU_ITEM);
 
-  int startY = 80;
-  int gap = 38;
-  int rectWidth = SCREEN_WIDTH - 10;
-  int rectX = 5;
+  int startY = 75;
+  int gap = 50;
+  int itemHeight = 42;
+  int rectWidth = SCREEN_WIDTH - 20;
+  int rectX = 10;
 
   // Draw Items for CURRENT PAGE
   int startIndex = _currentPage * ITEMS_PER_PAGE;
@@ -219,11 +223,12 @@ void MenuScreen::drawMenu(bool force) {
 
     if (force || stateChanged) {
       // Clear item area
-      tft->fillRect(rectX, yPos - 5, rectWidth, 30, COLOR_BG);
+      tft->fillRect(rectX, yPos, rectWidth, itemHeight, COLOR_BG);
 
       if (actualIndex == _selectedIndex) {
         tft->setTextColor(COLOR_BG, COLOR_HIGHLIGHT);
-        tft->fillRoundRect(rectX, yPos - 5, rectWidth, 30, 5, COLOR_HIGHLIGHT);
+        tft->fillRoundRect(rectX, yPos, rectWidth, itemHeight, 5,
+                           COLOR_HIGHLIGHT);
       } else {
         tft->setTextColor(COLOR_TEXT, COLOR_BG);
       }
@@ -231,7 +236,8 @@ void MenuScreen::drawMenu(bool force) {
       tft->setTextDatum(MC_DATUM);
       tft->setFreeFont(&Org_01);
       tft->setTextSize(FONT_SIZE_MENU_ITEM);
-      tft->drawString(menuLabels[actualIndex], SCREEN_WIDTH / 2, yPos + 10);
+      tft->drawString(menuLabels[actualIndex], SCREEN_WIDTH / 2,
+                      yPos + (itemHeight / 2));
     }
   }
 
@@ -247,11 +253,13 @@ void MenuScreen::drawMenu(bool force) {
 
     if (maxPage > 0) {
       if (_currentPage < maxPage) {
-        tft->fillTriangle(SCREEN_WIDTH / 2 - 10, 230, SCREEN_WIDTH / 2 + 10,
-                          230, SCREEN_WIDTH / 2, 238, COLOR_ACCENT);
+        // Down arrow (smaller, 8px width)
+        tft->fillTriangle(SCREEN_WIDTH / 2 - 8, 295, SCREEN_WIDTH / 2 + 8, 295,
+                          SCREEN_WIDTH / 2, 305, COLOR_ACCENT);
       } else if (_currentPage > 0) {
-        tft->fillTriangle(SCREEN_WIDTH / 2 - 10, 238, SCREEN_WIDTH / 2 + 10,
-                          238, SCREEN_WIDTH / 2, 230, COLOR_ACCENT);
+        // Up arrow (smaller, 8px width)
+        tft->fillTriangle(SCREEN_WIDTH / 2 - 8, 305, SCREEN_WIDTH / 2 + 8, 305,
+                          SCREEN_WIDTH / 2, 295, COLOR_ACCENT);
       }
     }
   }
