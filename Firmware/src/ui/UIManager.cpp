@@ -24,7 +24,9 @@ extern WiFiManager wifiManager;
 #include "screens/TimeSettingScreen.h" // Removed duplicate as per
 // instruction #include "screens/AutoOffScreen.h"
 #include "screens/GnssLogScreen.h"
+#include "screens/GpsDebugScreen.h"
 #include "screens/RpmSensorScreen.h"
+#include "screens/TouchDebugScreen.h"
 #include "screens/WebServerScreen.h"
 
 UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
@@ -38,8 +40,9 @@ UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _lastBat = -1;
   _lastLogging = false;
   _lastWifiStatus = -1;
-  _isDarkMode = true;         // Default Dark
-  _debugTouchEnabled = false; // Debug touch disabled by default
+  _isDarkMode = true;        // Default Dark
+  _debugTouchEnabled = true; // FORCE ENABLE DEBUG
+  _lastTouchProcessedTime = 0;
 }
 
 void UIManager::begin() {
@@ -59,6 +62,8 @@ void UIManager::begin() {
   _synchronizeScreen = new SynchronizeScreen();
   _gnssLogScreen = new GnssLogScreen();
   _webServerScreen = new WebServerScreen();
+  _gpsDebugScreen = new GpsDebugScreen();
+  _touchDebugScreen = new TouchDebugScreen();
 
   // Mulai Layar
   _splashScreen->begin(this);
@@ -76,6 +81,7 @@ void UIManager::begin() {
   _synchronizeScreen->begin(this);
   _gnssLogScreen->begin(this);
   _webServerScreen->begin(this);
+  _gpsDebugScreen->begin(this);
 
   // Initialize Sleep Logic (Standardized with power_save)
   Preferences prefs;
@@ -181,32 +187,56 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
   if (!_touch)
     return p;
 
+  // 1. Initial Read
   _touch->read();
   if (_touch->isTouched) {
-    updateInteraction(); // Reset timer on touch
+    int x1 = _touch->points[0].x;
+    int y1 = _touch->points[0].y;
 
-    int rawX = _touch->points[0].x;
-    int rawY = _touch->points[0].y;
+    // Reject immediate invalid zeros
+    if (x1 == 0 && y1 == 0)
+      return p;
 
-    // Calibration for 480x320 Display (Landscape)
-    // Touch controller native: 320x480 (Portrait)
-    // After swap: rawY (0-480) → screenX, rawX (0-320) → screenY
-    int pX = rawX;
-    int pY = rawY;
+    // 2. Stability Delay (Short wait to filter transient electrical spikes)
+    delay(20);
 
-    // 1. Swap XY (Portrait to Landscape)
-    if (TOUCH_SWAP_XY) {
-      int temp = pX;
-      pX = pY;   // pX now holds rawY (0-480 for screen X)
-      pY = temp; // pY now holds rawX (0-320 for screen Y)
+    // 3. Verification Read
+    _touch->read();
+    if (!_touch->isTouched) {
+      // It was a ghost spike!
+      return p;
     }
 
-    // 2. Balik X (Koordinat Layar)
+    int x2 = _touch->points[0].x;
+    int y2 = _touch->points[0].y;
+
+    // 4. Coordinate Consistency Check
+    // Ghost touches often jump wildly. Real touches are stable.
+    // Calculate distance squared to avoid sqrt
+    int dx = x1 - x2;
+    int dy = y1 - y2;
+    int distSq = dx * dx + dy * dy;
+
+    // Threshold: 20px variance allowed (finger wiggle)
+    if (distSq > 400) {
+      return p; // Inconsistent coordinates -> Noise
+    }
+
+    // --- PROCESSING VALID TOUCH ---
+    updateInteraction();
+
+    // Calibration Logic (Use the stable second read X2, Y2)
+    int pX = x2;
+    int pY = y2;
+
+    if (TOUCH_SWAP_XY) {
+      int temp = pX;
+      pX = pY;
+      pY = temp;
+    }
     if (TOUCH_INVERT_X) {
       pX = SCREEN_WIDTH - 1 - pX;
     }
-
-    // 3. Balik Y (Koordinat Layar)
     if (TOUCH_INVERT_Y) {
       pY = SCREEN_HEIGHT - 1 - pY;
     }
@@ -214,30 +244,33 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     p.x = pX;
     p.y = pY;
 
-    // Batasi
+    // Safety Clamp
     if (p.x < 0)
       p.x = 0;
-    if (p.x >= SCREEN_WIDTH)
-      p.x = SCREEN_WIDTH - 1;
+    if (p.x > SCREEN_WIDTH)
+      p.x = SCREEN_WIDTH;
     if (p.y < 0)
       p.y = 0;
-    if (p.y >= SCREEN_HEIGHT)
-      p.y = SCREEN_HEIGHT - 1;
+    if (p.y > SCREEN_HEIGHT)
+      p.y = SCREEN_HEIGHT;
 
-    // Draw debug dot if enabled
-    if (_debugTouchEnabled) {
-      _tft->fillCircle(p.x, p.y, 3, TFT_RED);
-    }
+    _wasTouched = true;
+    _lastTapTime = millis();
+    updateInteraction();
 
-    // Global Debounce Logic (250ms)
+    // Global Debounce (Time between valid clicks)
     unsigned long now = millis();
-    if (now - _lastTouchProcessedTime < 250) {
-      // Ignore this touch event
+    if (now - _lastTouchProcessedTime <
+        150) { // Increased to 150ms for safer UI
       p.x = -1;
       p.y = -1;
       return p;
     }
     _lastTouchProcessedTime = now;
+
+    if (_debugTouchEnabled) {
+      _tft->fillCircle(p.x, p.y, 3, TFT_RED);
+    }
   }
   return p;
 }
@@ -322,6 +355,14 @@ void UIManager::switchScreen(ScreenType type) {
   case SCREEN_WEB_SERVER:
     _currentScreen = _webServerScreen;
     _screenTitle = "OFFLINE SERVER";
+    break;
+  case SCREEN_GPS_DEBUG:
+    _currentScreen = _gpsDebugScreen;
+    _screenTitle = "GPS DEBUG";
+    break;
+  case SCREEN_TOUCH_DEBUG:
+    _currentScreen = _touchDebugScreen;
+    _screenTitle = "TOUCH DEBUG"; // Assuming a title for consistency
     break;
   }
 
@@ -518,10 +559,7 @@ void UIManager::drawStatusBar(bool force) {
     _tft->setTextDatum(MR_DATUM); // Rata Kanan Tengah
     _tft->setTextSize(1);
     _tft->setTextColor(getTextColor(), getBackgroundColor());
-    String pctStr = String(pct) + "% (" + String(voltage, 1) + "V)";
-    // Also debug raw to Serial if possible, but screen is better for user
-    // feedback
-    // Serial.printf("Bat: V=%f Pct=%d\n", voltage, pct);
+    String pctStr = String(pct) + "%";
     _tft->drawString(pctStr, SCREEN_WIDTH - 32, 10); // Centered at 10
 
     // Gambar Ikon Baterai

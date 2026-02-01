@@ -311,8 +311,8 @@ void LapTimerScreen::update() {
             // Second tap on SAME button -> Execute Action
 
             // Execute Action
-            if (touchedIdx == 0) {                  // Select Track
-              if (false && !gpsManager.isFixed()) { // GPS CHECK DISABLED
+            if (touchedIdx == 0) {         // Select Track
+              if (!gpsManager.isFixed()) { // GPS CHECK ENABLED
                 _state = STATE_NO_GPS;
                 _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                         SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
@@ -386,7 +386,7 @@ void LapTimerScreen::update() {
         if (p.x > btnX && p.x < btnX + btnW && p.y > btnY &&
             p.y < btnY + btnH) {
           // Capture GPS
-          if (true) { // Allow simulation / BYPASS GPS
+          if (gpsManager.isFixed()) { // GPS CHECK RESTORED
             _createStartLat = gpsManager.getLatitude();
             _createStartLon = gpsManager.getLongitude();
             _createStep = 1;
@@ -434,7 +434,7 @@ void LapTimerScreen::update() {
         int btn2X = SCREEN_WIDTH - 10 - btnW;
         if (p.x > btn2X && p.x < btn2X + btnW && p.y > btnY &&
             p.y < btnY + btnH) {
-          if (true || gpsManager.isFixed()) {
+          if (gpsManager.isFixed()) {
             _createFinishLat = gpsManager.getLatitude();
             _createFinishLon = gpsManager.getLongitude();
             // SAVE
@@ -595,12 +595,11 @@ void LapTimerScreen::update() {
             _recordedPoints.clear(); // Clear any previous points
           }
 
-          _state = STATE_SUMMARY;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                  _ui->getBackgroundColor());
-          drawSummary();
-          _ui->drawStatusBar();
+          _state = STATE_RACING;
+
+          // fillRect is handled by drawRacingStatic -> fillScreen
+          drawRacingStatic();
+          drawRacing();
         } else if (idx == 1) { // Select & Edit
           // Go to Details Screen
           _state = STATE_TRACK_DETAILS;
@@ -662,10 +661,10 @@ void LapTimerScreen::update() {
       }
 
       // 2. Select Button
-      // x = (W - 180)/2, y=240, w=180, h=45
+      // x = (W - 180)/2, y=255, w=180, h=45
       int btnW = 180;
       int btnX = (SCREEN_WIDTH - btnW) / 2;
-      int btnY = 240;
+      int btnY = 255;
       int btnH = 45;
 
       if (p.x > btnX && p.x < btnX + btnW && p.y > btnY - 10 &&
@@ -682,24 +681,99 @@ void LapTimerScreen::update() {
           _recordedPoints.clear();
         }
 
-        _state = STATE_SUMMARY;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                _ui->getBackgroundColor());
-        drawSummary();
-        _ui->drawStatusBar();
+        _state = STATE_RACING;
+        // fillRect handled by drawRacingStatic
+
+        drawRacingStatic();
+        drawRacing();
       }
 
       // 3. Edit Name Button
       // infoX = 250, infoW = 220 -> x = 420
+      // infoY = 80
       int renameX = 420;
-      int renameY = 60 + 5;
+      int renameY = 80 + 5;
       if (p.x > renameX && p.x < renameX + 45 && p.y > renameY &&
           p.y < renameY + 18) {
         _state = STATE_RENAME_TRACK;
         _renamingName = _tracks[_selectedTrackIdx].name;
         _keyboardShift = true;
-        drawRenameTrack();
+        drawRenameTrack(true); // Force Redraw to clear screen
+      }
+    }
+  } else if (_state == STATE_SAVE_TRACK) {
+    if (touched) {
+      if (millis() - _lastTouchTime < 150)
+        return;
+      _lastTouchTime = millis();
+
+      // 1. Handle Keyboard (Starts Y=90)
+      KeyboardComponent::KeyResult key = _keyboard.handleTouch(p.x, p.y, 90);
+      if (key.type != KeyboardComponent::KEY_NONE) {
+        if (key.type == KeyboardComponent::KEY_CHAR) {
+          if (_renamingName.length() < 15) {
+            _renamingName += key.value;
+            drawSaveTrackName(false);
+          }
+        } else if (key.type == KeyboardComponent::KEY_DEL) {
+          if (_renamingName.length() > 0) {
+            _renamingName.remove(_renamingName.length() - 1);
+            drawSaveTrackName(false);
+          }
+        } else if (key.type == KeyboardComponent::KEY_SPACE) {
+          if (_renamingName.length() < 15) {
+            _renamingName += ' ';
+            drawSaveTrackName(false);
+          }
+        } else if (key.type == KeyboardComponent::KEY_SHIFT) {
+          _keyboardShift = !_keyboardShift;
+          drawSaveTrackName(true);
+        } else if (key.type == KeyboardComponent::KEY_OK) {
+          // OK = SAVE
+          String finalName = _renamingName;
+          finalName.trim();
+          if (finalName.length() == 0)
+            finalName = "Track_" + String(millis());
+          String filename = "/tracks/" + finalName + ".gpx";
+          saveTrackToGPX(filename);
+          _ui->showToast("Saved!", 2000);
+          _state = STATE_TRACK_LIST;
+          loadTracks(); // Refresh list
+          drawTrackList();
+          return;
+        }
+      }
+
+      // 2. Buttons logic
+      int btnY = 275; // MATCH drawSaveTrackName
+      int btnW = 100;
+      int gap = 20;
+      int startX = (SCREEN_WIDTH - (btnW * 2 + gap)) / 2;
+
+      // Cancel (Left)
+      if (p.x > startX && p.x < startX + btnW && p.y > btnY &&
+          p.y < btnY + 40) {
+        _state = STATE_RECORD_TRACK;
+        _recordingState = RECORD_COMPLETE;
+        _lastRecordedStateRender = (RecordingState)-1; // Force full redraw
+        _ui->getTft()->fillScreen(_ui->getBackgroundColor()); // Clear
+        drawRecordTrack();
+        return;
+      }
+
+      // Save (Right)
+      int saveX = startX + btnW + gap;
+      if (p.x > saveX && p.x < saveX + btnW && p.y > btnY && p.y < btnY + 40) {
+        String finalName = _renamingName;
+        finalName.trim();
+        if (finalName.length() == 0)
+          finalName = "Track_" + String(millis());
+        String filename = "/tracks/" + finalName + ".gpx";
+        saveTrackToGPX(filename);
+        _ui->showToast("Saved!", 2000);
+        _state = STATE_TRACK_LIST;
+        loadTracks();
+        drawTrackList();
       }
     }
   } else if (_state == STATE_RENAME_TRACK) {
@@ -863,18 +937,14 @@ void LapTimerScreen::update() {
         int saveY = 200;
 
         // SAVE (Left)
+        // SAVE (Left)
         if (p.x > 130 && p.x < 230 && p.y > saveY && p.y < saveY + btnH) {
           if (_menuSelectionIdx == 12) {
-            // ACTION: SAVE
-            String filename = "/tracks/track_" + String(millis()) + ".gpx";
-            saveTrackToGPX(filename);
-            _ui->showToast("Saved!", 2000);
-
-            _state = STATE_TRACK_LIST; // Go to list to see new track
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    _ui->getBackgroundColor());
-            drawTrackList();
+            // ACTION: SAVE -> GO TO NAMING
+            _state = STATE_SAVE_TRACK;
+            _renamingName = "";
+            _keyboardShift = true;
+            drawSaveTrackName(true);
             _menuSelectionIdx = -1;
           } else {
             _menuSelectionIdx = 12;
@@ -1260,22 +1330,15 @@ void LapTimerScreen::drawTrackDetails() {
   tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
 
-  // Divider (Moved below Header Box to avoid overlap)
-  tft->drawFastHLine(0, 50, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Divider
+  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
 
-  // Title Box
-  int headW = 180;
-  int headH = 28;
-  int headX = (SCREEN_WIDTH - headW) / 2;
-  int headY = 18;
-  tft->fillRoundRect(headX, headY, headW, headH, 6, 0x10A2); // Slate
-  tft->drawRoundRect(headX, headY, headW, headH, 6, TFT_SILVER);
-
+  // Title (Centered Below Header)
   tft->setTextDatum(MC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->setTextColor(TFT_WHITE, 0x10A2);
-  tft->drawString("TRACK DETAILS", SCREEN_WIDTH / 2, headY + headH / 2 + 1);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK);
+  tft->drawString("TRACK DETAILS", SCREEN_WIDTH / 2, 45);
 
   // Back Arrow
   tft->setTextDatum(TL_DATUM);
@@ -1283,15 +1346,16 @@ void LapTimerScreen::drawTrackDetails() {
   tft->drawString("<", 10, 25);
 
   // --- LAYOUT ---
+  // --- LAYOUT ---
   int mapX = 10;
-  int mapY = 60;
+  int mapY = 80; // Shifted Down (was 60)
   int mapW = 230;
-  int mapH = 160;
+  int mapH = 150; // Reduced height (was 160)
 
   int infoX = 250;
-  int infoY = 60;
+  int infoY = 80; // Shifted Down
   int infoW = 220;
-  int infoH = 160;
+  int infoH = 150;
 
   // 1. MAP CARD
   tft->fillRoundRect(mapX, mapY, mapW, mapH, 8, 0x18E3); // Charcoal
@@ -1724,11 +1788,11 @@ void LapTimerScreen::drawNoGPS() {
   tft->drawString("Cannot record track.", SCREEN_WIDTH / 2, cardY + 55);
   tft->drawString("Please check GPS antenna.", SCREEN_WIDTH / 2, cardY + 75);
 
-  // --- CONTINUE BUTTON ---
-  int btnW = 140;
-  int btnH = 36;
+  // 3. START BUTTON (Bottom Center)
+  int btnW = 180;
+  int btnH = 45;
   int btnX = (SCREEN_WIDTH - btnW) / 2;
-  int btnY = SCREEN_HEIGHT - 50;
+  int btnY = 255; // Shifted Down (was 240)
 
   tft->fillRoundRect(btnX, btnY, btnW, btnH, 6, L_COLOR_BTN);
   tft->drawRoundRect(btnX, btnY, btnW, btnH, 6, TFT_WHITE);
@@ -2537,12 +2601,16 @@ void LapTimerScreen::saveNewTrack(String name, double sLat, double sLon,
   }
 }
 
-void LapTimerScreen::drawRenameTrack() {
+void LapTimerScreen::drawRenameTrack(bool force) {
   TFT_eSPI *tft = _ui->getTft();
   static String lastRenamingName = "";
   static bool lastShift = !_keyboardShift;
 
-  bool fullRedraw = (lastRenamingName == "");
+  if (force) {
+    lastRenamingName = ""; // Reset history
+  }
+
+  bool fullRedraw = force || (lastRenamingName == "");
 
   if (fullRedraw) {
     tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
@@ -2566,6 +2634,7 @@ void LapTimerScreen::drawRenameTrack() {
 
     tft->setTextColor(TFT_WHITE, 0x18E3);
     tft->setTextFont(2);
+    tft->setTextSize(1); // Force standard size
     tft->setTextDatum(MC_DATUM);
     tft->drawString(_renamingName + "|", SCREEN_WIDTH / 2, boxY + boxH / 2 + 1);
     lastRenamingName = _renamingName;
@@ -2611,4 +2680,65 @@ void LapTimerScreen::renameTrack(int index, String newName) {
       }
     }
   }
+}
+void LapTimerScreen::drawSaveTrackName(bool force) {
+  TFT_eSPI *tft = _ui->getTft();
+
+  if (force) {
+    tft->fillScreen(_ui->getBackgroundColor());
+
+    // Title
+    tft->setTextFont(1);
+    tft->setTextSize(1);
+    tft->setTextColor(COLOR_PRIMARY, _ui->getBackgroundColor());
+    tft->setTextDatum(TC_DATUM);
+    tft->drawString("NAME YOUR TRACK", SCREEN_WIDTH / 2, 5);
+
+    // Input Box
+    int boxW = 300;
+    int boxH = 40;
+    int boxX = (SCREEN_WIDTH - boxW) / 2;
+    int boxY = 40;
+
+    tft->drawRect(boxX, boxY, boxW, boxH, COLOR_SECONDARY);
+    tft->fillRect(boxX + 1, boxY + 1, boxW - 2, boxH - 2, TFT_DARKGREY);
+
+    // Draw Buttons (SAVE / CANCEL) at Bottom
+    int btnY = 275; // Moved down to avoid keyboard overlap
+    int btnW = 100;
+    int gap = 20;
+    int startX = (SCREEN_WIDTH - (btnW * 2 + gap)) / 2;
+
+    // CANCEL
+    int cancelX = startX;
+    tft->fillRect(cancelX, btnY, btnW, 40, TFT_RED);
+    tft->drawRect(cancelX, btnY, btnW, 40, TFT_WHITE);
+    tft->setTextColor(TFT_WHITE, TFT_RED);
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextSize(1);
+    tft->drawString("CANCEL", cancelX + btnW / 2, btnY + 20);
+
+    // SAVE
+    int saveX = startX + btnW + gap;
+    tft->fillRect(saveX, btnY, btnW, 40, COLOR_PRIMARY);
+    tft->drawRect(saveX, btnY, btnW, 40, TFT_BLACK);
+    tft->setTextColor(TFT_BLACK, COLOR_PRIMARY);
+    tft->drawString("SAVE", saveX + btnW / 2, btnY + 20);
+  }
+
+  // Draw Current Text
+  int boxW = 300;
+  int boxX = (SCREEN_WIDTH - boxW) / 2;
+  int boxY = 40;
+
+  tft->setTextFont(1);
+  tft->setTextSize(2);
+  tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
+  tft->setTextDatum(ML_DATUM);
+  tft->setTextPadding(boxW - 10);
+  tft->drawString(_renamingName, boxX + 10, boxY + 20);
+  tft->setTextPadding(0);
+
+  // Draw Keyboard (Y=90 to fit)
+  _keyboard.draw(tft, 90, _keyboardShift);
 }

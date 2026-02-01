@@ -104,298 +104,173 @@ void drawSegment(TFT_eSPI *tft, int x, int y, int w, int h, int angleOffset,
                     color);
 }
 
+// --- LAYOUT CORRECTIONS ---
 void SpeedometerScreen::drawDashboard(bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // --- PENGATURAN WARNA ---
-  uint16_t colTheme = TFT_GREEN;                 // Warna utama (Hijau)
-  uint16_t colRed = TFT_RED;                     // Warna merah untuk Top Speed
-  uint16_t colWhite = _ui->getTextColor();       // Warna putih (Teks Utama)
-  uint16_t colBlack = _ui->getBackgroundColor(); // Warna hitam (Latar Belakang)
+  // --- THEME COLORS ---
+  uint16_t colPrimary = COLOR_PRIMARY;
+  uint16_t colText = _ui->getTextColor();
+  uint16_t colBg = _ui->getBackgroundColor();
+  uint16_t colCardBorder = TFT_DARKGREY;
 
-  // Special case: Inverted boxes (e.g. Center Box was White BG, Black Text)
-  // If Dark Mode: BG=Black, colWhite=White. CenterBox=White, Text=Black. OK.
-  // If Light Mode: BG=White, colWhite=Black. CenterBox=Black (should be?),
-  // Text=White. We need distinct "Contrast Text" and "Contrast BG" or just
-  // strictly use logic.
+  // Layout Constants (Optimized for 480x320)
+  int cardY = 25; // Moved UP (Status bar is 20)
+  int cardH = 50; // Taller to fit content
+  int cardW = 130;
+  int gap = 15;
+  int startX = 25; // 25 + 130 + 15 + 130 + 15 + 130 + 25 = 470
 
-  // Let's redefine for clarity in this specific dashboard which uses "Boxes"
-  uint16_t colBoxBg =
-      _ui->getTextColor(); // Box Background (Opposite of Main BG)
-  uint16_t colBoxText =
-      _ui->getBackgroundColor(); // Text inside Box (Same as Main BG)
-
-  // --- PENGATURAN POSISI (OFFSET) ---
-  int offTop = 15; // Geser Atas (Dikurangi dari 33 agar naik)
-  int offBot = 10; // Geser Bawah (Dikurangi dari 28)
-  // int dx = (SCREEN_WIDTH - 320) / 2; // REMOVED: Utilizing full screen
-  // (480px)
+  // Y Positions
+  int valY = cardY + 30; // Center values in card
+  int speedY = 140;      // Moved DOWN (was 115) to avoid overlap
+  int unitY = speedY + 50;
+  int tripLabelY = unitY + 30;
+  int tripValY = tripLabelY + 20;
 
   if (force) {
-    // Clear only content area
+    // Clear Content
     _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                               SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
     _ui->drawStatusBar(true);
 
-    // --- 0. INDIKATOR KECIL DI ATAS (Revised width for 480px) ---
-    // Layout: 3 Boxes. Approx 130px width each.
-    // Margin 25px. Spacing 15px.
-    // Box 1 X=25. Box 2 X=170. Box 3 X=315.
-    // Total Width used: 25 + 130 + 15 + 130 + 15 + 130 + 25 = 470. Fits nicely.
+    // --- TOP DATA CARDS ---
+    tft->drawRoundRect(startX, cardY, cardW, cardH, 6, colCardBorder);
+    tft->drawRoundRect(startX + cardW + gap, cardY, cardW, cardH, 6,
+                       colCardBorder);
+    tft->drawRoundRect(startX + (cardW + gap) * 2, cardY, cardW, cardH, 6,
+                       colCardBorder);
 
-    int boxY = 22;
-    int boxH = 30;
-    int boxW = 130;
-    int gap = 15;
-    int startX = 25;
-
-    // Layout: Left(25) - Center(170) - Right(315)
-    tft->fillRect(startX, boxY, boxW, boxH, colTheme); // Hijau
-    tft->fillRect(startX + boxW + gap, boxY, boxW, boxH,
-                  colBoxBg); // Putih (Contrast)
-    tft->fillRect(startX + (boxW + gap) * 2, boxY, boxW, boxH, colRed); // Merah
-
-    // --- TEXT INDIKATOR ---
-    char buf[10];
+    // --- LABELS (Inside Cards, Top) ---
     tft->setFreeFont(&Org_01);
-    tft->setTextSize(2); // Perbesar teks agar sesuai box
-    tft->setTextDatum(MC_DATUM);
+    tft->setTextSize(1);
+    tft->setTextColor(TFT_SILVER, colBg);
+    tft->setTextDatum(TC_DATUM);
 
-    int yTextMid = boxY + (boxH / 2) + 2; // +2 adjustment for font baseline
+    int labelY = cardY + 4;
+    tft->drawString("MAX RPM", startX + (cardW / 2), labelY);
+    tft->drawString("MAX SPEED", startX + cardW + gap + (cardW / 2), labelY);
+    tft->drawString("SATELLITES", startX + (cardW + gap) * 2 + (cardW / 2),
+                    labelY);
 
-    // Box 1 (Green/Kiri): Max RPM
-    tft->setTextColor(colBoxText, colTheme);
-    sprintf(buf, "%d", _maxRPM);
-    tft->drawString(buf, startX + (boxW / 2), yTextMid);
-
-    // Box 2 (White/Tengah): Max Speed
-    tft->setTextColor(colBoxText, colBoxBg);
-    sprintf(buf, "%.0f", _maxSpeed);
-    tft->drawString(buf, startX + boxW + gap + (boxW / 2), yTextMid);
-
-    // Box 3 (Red/Kanan): GPS Signal
-    tft->setTextColor(colBoxText, colRed);
-    sprintf(buf, "%d", _lastSats);
-    tft->drawString(buf, startX + (boxW + gap) * 2 + (boxW / 2), yTextMid);
-
-    tft->setTextDatum(TL_DATUM); // Reset
-
-    // --- 1. HEADER BAR (SPEED) ---
-    int headerY = 70; // Ensure separation from Top Boxes (Y=22+30=52)
-    tft->fillRect(0, headerY, SCREEN_WIDTH, 22, TFT_WHITE); // Force White BG
-
-    // Tulisan "SPEED" - DI CENTERKAN
-    tft->setTextColor(TFT_BLACK, TFT_WHITE); // Force Black Text
+    // --- UNIT ---
     tft->setTextFont(2);
     tft->setTextSize(1);
-    tft->setTextDatum(MC_DATUM);
-    tft->drawString("SPEED", SCREEN_WIDTH / 2, headerY + 11);
+    tft->setTextColor(colPrimary, colBg);
+    tft->drawCentreString("km/h", SCREEN_WIDTH / 2, unitY, 1);
 
-    // Requested Titles "RPM" (Left) and "MAX" (Right)
-    tft->drawString("RPM", startX + (boxW / 2), headerY + 11);
-    tft->drawString("MAX", startX + (boxW + gap) * 2 + (boxW / 2),
-                    headerY + 11);
+    // --- TRIP METER CARD ---
+    int tripBoxW = 200;
+    int tripBoxH = 50;
+    int tripBoxX = (SCREEN_WIDTH - tripBoxW) / 2;
+    int tripBoxY = unitY + 25; // Spacing below unit
 
-    tft->setTextDatum(TL_DATUM);
+    tft->drawRoundRect(tripBoxX, tripBoxY, tripBoxW, tripBoxH, 6,
+                       colCardBorder);
 
-    // --- 2. ANGKA KECEPATAN BESAR ---
-    tft->setTextColor(colTheme, _ui->getBackgroundColor());
-    tft->setTextFont(7); // 7-Segment Font
-    tft->setTextSize(2); // Massive (100px high)
-    tft->setTextDatum(MC_DATUM);
-
-    int yCenterSpeed = 100; // Moved UP relative to 125
-
-    char speedBuf[10];
-    sprintf(speedBuf, "%.0f", _lastSpeed);
-    tft->drawString(speedBuf, SCREEN_WIDTH / 2, yCenterSpeed);
-    tft->setTextDatum(TL_DATUM);
-
-    // Satuan "Km/H"
-    tft->setTextFont(2);
-    tft->setTextSize(1);
-    tft->drawCentreString("Km/H", SCREEN_WIDTH / 2, 155, 1); // Below Speed
-
-    // --- 3. DATA TRIP ---
-    tft->setTextColor(colTheme, _ui->getBackgroundColor());
-    tft->setTextFont(2); // Small Font for Label
-    tft->setTextSize(1);
-    tft->drawCentreString("LONG TRIP", SCREEN_WIDTH / 2, 175, 1);
-
-    // Trip Value
-    tft->setTextFont(4); // Larger Font for Value (Squares style)
-    tft->setTextSize(1);
-    char tripBuf[10];
-    sprintf(tripBuf, "%04.0f", _lastTrip);
-    tft->drawCentreString(tripBuf, SCREEN_WIDTH / 2, 195, 1);
-
-    // --- 5. SKALA & GARIS ---
-    int yScaleVal = 225; // Adjusted down
-
-    tft->setTextColor(colWhite, _ui->getBackgroundColor());
-    tft->setTextSize(1);
-
-    // Scale positions for 480px width
-    // Range ~20 to ~460. Width ~440.
-    // Ticks: 0, 40, 80, 100, 120, 150 (6 ticks).
-    // Let's space them: X=40, 110, 180, 240, 310, 380 ??? Can be arbitrary.
-    // Let's try to map the old positions proportionally.
-    // Old: 45, 83, 126, 170, 217, 269 (Range ~224px).
-    // New Scale factor ~1.5 -> Range ~336px? No, use full width.
-    // Let's use simpler fixed points for wider stance.
-    // 0 -> X=60
-    // 40 -> X=120
-    // 80 -> X=180
-    // 100 -> X=240 (Center)
-    // 120 -> X=300
-    // 150 -> X=360
-    // ... This is tight.
-
-    // Wider:
-    // 0 -> 40
-    // 40 -> 110
-    // 80 -> 180
-    // 100 -> 240 (Center seems weird for linear speed if 100 is center. But
-    // this isn't linear scale ticks, just labels) Let's stick to the visual
-    // look: Spread out. 0, 40, 80, 100, 120, 150 X Positions:
-    // Wider to match RPM Bar (40 to 440)
-    int x1 = 40, x2 = 120, x3 = 200, x4 = 280, x5 = 360, x6 = 440;
-
-    tft->drawString("0", x1, yScaleVal);
-    tft->drawString("40", x2, yScaleVal);
-    tft->drawString("80", x3, yScaleVal);
-    tft->drawString("100", x4, yScaleVal);
-    tft->drawString("120", x5, yScaleVal);
-    tft->drawString("150", x6, yScaleVal);
-
-    // Garis Horizontal
-    uint16_t c = colWhite;
-    int yLine = 240; // Adjusted down
-    // Lines below numbers. ~30px wide segments.
-    int segW = 30;
-    // Align centers with numbers roughly. Num width ~15px.
-    // Center at x + 8 approx.
-    tft->drawLine(x1 + 5, yLine, x1 + segW, yLine, c);
-    tft->drawLine(x2 + 5, yLine, x2 + segW, yLine, c);
-    tft->drawLine(x3 + 5, yLine, x3 + segW, yLine, c);
-    tft->drawLine(x4 + 5, yLine, x4 + segW, yLine, c);
-    tft->drawLine(x5 + 5, yLine, x5 + segW, yLine, c);
-    // tft->drawLine(x6+5, yLine, x6+segW, yLine, c); // Skip last? Old code
-    // skipped one? No, 5 ticks.
-
-    // Garis Vertikal (Ticks) - Draw at end of segments?
-    tft->drawLine(x1 + segW, yLine, x1 + segW, yLine - 3, c);
-    tft->drawLine(x2 + segW, yLine, x2 + segW, yLine - 3, c);
-    tft->drawLine(x3 + segW, yLine, x3 + segW, yLine - 3, c);
-    tft->drawLine(x4 + segW, yLine, x4 + segW, yLine - 3, c);
-    tft->drawLine(x5 + segW, yLine, x5 + segW, yLine - 3, c);
-
-    // --- 6. BAR RPM ---
-    int yRPM = 290; // Bottom
-    int rpmBarX = 40;
-    int rpmBarW = 400; // Wider
-    tft->drawRect(rpmBarX - 1, yRPM, rpmBarW + 2, 17, colWhite);
-
-    // ANGKA LIVE RPM
-    tft->setTextSize(2);
-    tft->setTextColor(colWhite, _ui->getBackgroundColor());
-    char rpmBuf[10];
-    int dispRpm = (_lastRPM < 0) ? 0 : _lastRPM;
-    sprintf(rpmBuf, "%d", dispRpm);
-    tft->drawCentreString(rpmBuf, SCREEN_WIDTH / 2, 260, 1); // Above Bar
-
-    // Isi Bar RPM
-    int curRpmWidth = map(constrain(_lastRPM, 0, 8000), 0, 8000, 0, rpmBarW);
-
-    tft->fillRect(rpmBarX, yRPM + 1, curRpmWidth, 15, colTheme);
-    tft->fillRect(rpmBarX + curRpmWidth, yRPM + 1, rpmBarW - curRpmWidth, 15,
-                  COLOR_BG);
-  }
-
-  // --- UPDATE DINAMIS ---
-  if (!force) {
-    char buf[10];
+    // Label
     tft->setFreeFont(&Org_01);
-
-    // Dynamic Layout Values (Must match Static!)
-    int boxY = 22;
-    int boxH = 30;
-    int boxW = 130;
-    int gap = 15;
-    int startX = 25;
-    int yTextMid = boxY + (boxH / 2) + 2;
-
-    // Update Indikator Atas
-    tft->setTextSize(2);
-    tft->setTextDatum(MC_DATUM);
-
-    // Box 1: Max RPM
-    tft->setTextColor(colBoxText, colTheme);
-    tft->setTextPadding(100);
-    sprintf(buf, "%d", _maxRPM);
-    tft->drawString(buf, startX + (boxW / 2), yTextMid);
-    tft->setTextPadding(0);
-
-    // Box 2: Max Speed
-    tft->setTextColor(colBoxText, colBoxBg);
-    tft->setTextPadding(100);
-    sprintf(buf, "%.0f", _maxSpeed);
-    tft->drawString(buf, startX + boxW + gap + (boxW / 2), yTextMid);
-    tft->setTextPadding(0);
-
-    // Box 3: GPS Satellites
-    tft->setTextColor(colBoxText, colRed);
-    tft->setTextPadding(100);
-    sprintf(buf, "%d", _lastSats);
-    tft->drawString(buf, startX + (boxW + gap) * 2 + (boxW / 2), yTextMid);
-    tft->setTextPadding(0);
-
-    tft->setTextDatum(TL_DATUM);
-
-    // 2. Update Speed Utama
-    tft->setTextColor(colTheme, _ui->getBackgroundColor());
-    tft->setTextFont(7);
-    tft->setTextSize(2);
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextPadding(480); // Full width padding to clear old number
-    int yCenterSpeed = 100;   // Synced with Static
-    char speedBuf[10];
-    sprintf(speedBuf, "%.0f", _lastSpeed);
-    tft->drawString(speedBuf, SCREEN_WIDTH / 2, yCenterSpeed);
-    tft->setTextPadding(0);
-    tft->setTextDatum(TL_DATUM);
-
-    // 3. Update Trip
-    tft->setTextColor(colTheme, _ui->getBackgroundColor());
-    tft->setTextFont(4); // Match Static
     tft->setTextSize(1);
-    tft->setTextPadding(200);
-    // Format: "0000"
-    char tripBuf[10];
-    sprintf(tripBuf, "%04.0f", _lastTrip);
-    tft->drawCentreString(tripBuf, SCREEN_WIDTH / 2, 195, 1);
-    tft->setTextPadding(0);
+    tft->setTextColor(TFT_SILVER, colBg);
+    tft->setTextDatum(TC_DATUM);
+    tft->drawString("TRIP DISTANCE", SCREEN_WIDTH / 2, tripBoxY + 5);
 
-    // 4. Update Bar RPM & ANGKA RPM LIVE
-    int rpmBarX = 40;
-    int rpmBarW = 400;
-    int curRpmWidth = map(constrain(_lastRPM, 0, 8000), 0, 8000, 0, rpmBarW);
-    int yRPM = 290; // Synced with Static
+    // --- RPM BAR OUTLINE ---
+    int rpmY = 290;
+    int rpmH = 12;
+    int rpmW = 400;
+    int rpmX = (SCREEN_WIDTH - rpmW) / 2;
 
-    // Update Bar
-    tft->fillRect(rpmBarX, yRPM + 1, curRpmWidth, 15, colTheme);
-    tft->fillRect(rpmBarX + curRpmWidth, yRPM + 1, rpmBarW - curRpmWidth, 15,
-                  COLOR_BG);
-
-    // Update Angka RPM
-    tft->setTextSize(2);
-    tft->setTextColor(colWhite, _ui->getBackgroundColor());
-    tft->setTextPadding(100);
-    char rpmBuf[10];
-    int dispRpm = (_lastRPM < 0) ? 0 : _lastRPM;
-    sprintf(rpmBuf, "%d", dispRpm);
-    tft->drawCentreString(rpmBuf, SCREEN_WIDTH / 2, 260,
-                          1); // Synced with Static
-    tft->setTextPadding(0);
+    tft->drawRect(rpmX - 1, rpmY - 1, rpmW + 2, rpmH + 2, TFT_DARKGREY);
+    tft->setTextDatum(MR_DATUM);
+    tft->drawString("RPM", rpmX - 10, rpmY + 6);
   }
+
+  // --- DYNAMIC UPDATES ---
+  char buf[32];
+
+  // 1. UPDATE CARDS VALUES
+  // Use Font 4 but handle padding carefully
+  tft->setTextDatum(MC_DATUM);
+  tft->setTextColor(colText, colBg);
+  tft->setTextFont(4);
+  tft->setTextSize(1);
+
+  // Padding - Use Background Color to clear
+  // To avoid box overlap, we must clamp padding or use fillRect
+  int padW = cardW - 10;
+
+  // Max RPM
+  tft->setTextPadding(padW);
+  sprintf(buf, "%d", _maxRPM);
+  tft->drawString(buf, startX + (cardW / 2), valY);
+
+  // Max Speed
+  sprintf(buf, "%.0f", _maxSpeed);
+  tft->drawString(buf, startX + cardW + gap + (cardW / 2), valY);
+
+  // Sats
+  sprintf(buf, "%d", _lastSats);
+  tft->drawString(buf, startX + (cardW + gap) * 2 + (cardW / 2), valY);
+  tft->setTextPadding(0);
+
+  // 2. MAIN SPEED
+  tft->setTextFont(7); // 7-Segment
+  tft->setTextSize(2);
+  tft->setTextColor(colPrimary, colBg);
+  tft->setTextDatum(MC_DATUM);
+
+  // Use fillRect to clear previous speed strictly within the speed area
+  // to avoid clearing the cards above if font is huge
+  // Font 7 Size 2 is approx 100px high
+  // Y=140. Top=90. Bottom=190.
+  // Previous overlap was hitting Y=80 (Card bottom)
+
+  // Only redraw if changed? The caller handles that check usually,
+  // but force means everything. This 'if(!force)' block is for updates.
+  // Actually, the caller logic:
+  // if (speed != _lastSpeed ... ) drawDashboard(false);
+  // So we are safe to draw.
+
+  tft->setTextPadding(SCREEN_WIDTH);
+  sprintf(buf, "%.0f", _lastSpeed);
+  tft->drawString(buf, SCREEN_WIDTH / 2, speedY);
+  tft->setTextPadding(0);
+
+  // 3. TRIP VALUE
+  // Recalculate Y based on new Box logic
+  int tripBoxY = unitY + 25;
+  tripValY = tripBoxY + 28; // Lower half of box
+
+  tft->setTextFont(4);
+  tft->setTextSize(1);
+  tft->setTextColor(colText, colBg);
+
+  tft->setTextPadding(180); // Clear width of box interior
+  sprintf(buf, "%04.1f", _lastTrip);
+  tft->drawString(buf, SCREEN_WIDTH / 2, tripValY);
+  tft->setTextPadding(0);
+
+  // 4. RPM BAR & VALUE
+  int rpmY = 290;
+  int rpmH = 12;
+  int rpmW = 400;
+  int rpmX = (SCREEN_WIDTH - rpmW) / 2;
+
+  // Draw Fill
+  int fillW = map(constrain(_lastRPM, 0, 9000), 0, 9000, 0, rpmW);
+  if (fillW > 0)
+    tft->fillRect(rpmX, rpmY, fillW, rpmH, colPrimary);
+  if (fillW < rpmW)
+    tft->fillRect(rpmX + fillW, rpmY, rpmW - fillW, rpmH, colBg);
+
+  // RPM Value
+  tft->setTextFont(2);
+  tft->setTextSize(1);
+  tft->setTextColor(colText, colBg);
+  tft->setTextDatum(ML_DATUM);
+  tft->setTextPadding(60);
+  sprintf(buf, "%d", _lastRPM);
+  tft->drawString(buf, rpmX + rpmW + 10, rpmY + 6);
+  tft->setTextPadding(0);
 }

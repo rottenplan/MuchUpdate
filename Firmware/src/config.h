@@ -18,8 +18,12 @@
 // Touch Screen (GT911 via I2C)
 #define TOUCH_SDA 33
 #define TOUCH_SCL 32
-#define TOUCH_INT 21
+#define TOUCH_INT -1 // Set to -1 to poll. GPIO 21 is used by GPS TX.
 #define TOUCH_RST 25
+
+// Display Reset (Matches platformio.ini)
+#define PIN_TFT_RST -1
+
 // Native Resolution (Portrait)
 #define TOUCH_WIDTH 320
 #define TOUCH_HEIGHT 480
@@ -37,23 +41,24 @@
 #define PIN_SD_MISO 19
 
 // Peripherals
-// Peripherals
-// #define PIN_RGB_RED 4
-// #define PIN_RGB_GREEN 16 // Disabled: Used for GPS_TX
-// #define PIN_RGB_BLUE 17  // Disabled: Used for GPS_RX
+#define PIN_RGB_RED 4
+#define PIN_RGB_GREEN 16
+#define PIN_RGB_BLUE 17
 // #define PIN_LIGHT_SENSOR 34
 // #define PIN_SPEAKER 26
 #define PIN_RPM_INPUT 35 // User requested 35
 
 // GPS / UART
-// Standard Serial Pins (Conflict with USB Debugging!)
-#define PIN_GPS_RX 3
-#define PIN_GPS_TX 1
-#define GPS_BAUD 115200 // Increased from 9600 for faster GPS lock
-// #define PIN_LIGHT_SENSOR 34 // Removed: Used for Battery
-// #define PIN_BATTERY 35 // Disabled by user request
+// GPS at GPIO 21/22 (Serial2) per user request
+// UART0 (GPIO 1/3) reserved for PC Debugging
+#define PIN_GPS_RX 22
+#define PIN_GPS_TX -1 // Disabled to prevent conflict with TOUCH_INT (Pin 21)
+// #define PIN_GPS_TX 21 // CONFLICT: Hardware connects this to Touch Int
+#define GPS_BAUD 9600
+// #define PIN_LIGHT_SENSOR 34
+#define PIN_BATTERY 34 // Enabled per user request
 #define BATTERY_VOLTAGE_MAX 4.2
-#define BATTERY_VOLTAGE_MIN 3.0 // Lowered to 3.0V to capture lower range
+#define BATTERY_VOLTAGE_MIN 3.0
 
 // ==========================================
 // SYSTEM CONSTANTS

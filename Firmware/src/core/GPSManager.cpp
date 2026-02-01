@@ -5,111 +5,187 @@
 #include <Preferences.h>
 
 void GPSManager::begin() {
-  Preferences prefs;
-  prefs.begin("laptimer", true); // Read-only first
+  // Note: Serial is now used for GPS (UART0), not debug output!
+  // Debug output disabled to avoid conflict with GPS on GPIO 1/3
 
-  // Load Config
-  _rxPin = prefs.getInt("gps_rx_pin", PIN_GPS_RX);
-  _txPin = prefs.getInt("gps_tx_pin", PIN_GPS_TX);
-  _baudRate = prefs.getInt("gps_baud", GPS_BAUD);
+  _rxPin = PIN_GPS_RX;
+  _txPin = PIN_GPS_TX;
 
-  // Load Other Config
-  _totalDistance = prefs.getDouble("total_trip", 0.0);
-  _currentGnssMode = prefs.getInt("gnss_mode", 1);
-  _currentDynModel = prefs.getInt("gnss_model", 3);
-  _currentSBAS = prefs.getInt("gnss_sbas", 0);
-  _currentSBAS = prefs.getInt("gnss_sbas", 0);
-  _projectionEnabled = prefs.getBool("gnss_proj", true);
-  _utcOffset = prefs.getInt("utc_offset", 0);
-  _utcOffset = prefs.getInt("utc_offset", 0);
-  _rpmEnabled = prefs.getBool("rpm_enabled", true); // Default: Enabled
+  // SAFEGUARD: Ensure Pin 21 is NEVER used for TX
+  if (_txPin == 21) {
+    Serial.println(
+        "WARNING: GPS TX set to 21! Forcing to -1 to prevent crash.");
+    _txPin = -1;
+  }
 
-  // Load PPR
-  int pprIdx = prefs.getInt("rpm_ppr", 0);
-  setPPRIndex(pprIdx); // Initialize _currentPPR
+  _baudRate = GPS_BAUD;
 
-  prefs.end();
-
-  // Gunakan Serial2 untuk GPS
+  // GPS uses UART2 (Serial2) on GPIO 21/22
+  // UART0 (Serial) is reserved for PC Debugging on GPIO 1/3
   _gpsSerial = &Serial2;
 
-  // NEGOTIATE BAUD RATE
-  // 1. Start at default 9600 (Standard factory default)
-  _gpsSerial->begin(9600, SERIAL_8N1, _rxPin, _txPin);
+  Serial.printf("GPS Manager Begin: RX=%d, TX=%d\n", _rxPin, _txPin);
+
+  // Auto-detect baud rate
+  if (!detectBaudRate()) {
+    // Fallback if detection fails
+    _baudRate = GPS_BAUD;
+    // Explicitly use _txPin (which is safely -1)
+    _gpsSerial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
+    Serial.println("GPS: Auto-baud failed. Using default.");
+  }
+
+  delay(500); // Wait for GPS module to stabilize
+
+  // Configure NEO-M8N to enable UBX-NAV-PVT message (92 bytes, contains all nav
+  // data) UBX-CFG-MSG: Enable NAV-PVT message
+  uint8_t enableNavPvt[] = {
+      0xB5, 0x62, // Header
+      0x06, 0x01, // CFG-MSG
+      0x03, 0x00, // Length = 3 bytes
+      0x01,       // Message Class: NAV (0x01)
+      0x07,       // Message ID: PVT (0x07)
+      0x01,       // Rate: send every solution
+      0x00, 0x00  // Checksum placeholder
+  };
+
+  // Calculate UBX checksum
+  uint8_t ck_a = 0, ck_b = 0;
+  for (int i = 2; i < 9; i++) {
+    ck_a += enableNavPvt[i];
+    ck_b += ck_a;
+  }
+  enableNavPvt[9] = ck_a;
+  enableNavPvt[10] = ck_b;
+
+  _gpsSerial->write(enableNavPvt, 11);
   delay(100);
 
-  // 2. Switch to configured rate if different
-  if (_baudRate != 9600) {
-    configureGpsBaud(_baudRate);
-    delay(250);                            // Give GPS time to switch
-    _gpsSerial->updateBaudRate(_baudRate); // Switch ESP32 UART speed
+  // Enable UBX-NAV-SAT (0x01 0x35)
+  uint8_t enableNavSat[] = {0xB5, 0x62, 0x06, 0x01, 0x03, 0x00,
+                            0x01, 0x35, 0x01, 0x00, 0x00};
+  // Calc Checksum
+  ck_a = 0;
+  ck_b = 0;
+  for (int i = 2; i < 9; i++) {
+    ck_a += enableNavSat[i];
+    ck_b += ck_a;
   }
+  enableNavSat[9] = ck_a;
+  enableNavSat[10] = ck_b;
+  _gpsSerial->write(enableNavSat, 11);
+  delay(100);
 
-  // Apply Config (if GPS active)
-  if (_gpsSerial) {
-    delay(100); // Wait for GPS boot
+  // Serial.println NOT available - Serial used for GPS data!
 
-    // Optimize: Set 5Hz update rate (More stable signal)
-    setFrequencyLimit(5);
-
-    // Optimize: Disable unnecessary NMEA sentences
-    disableUnnecessarySentences();
-
-    setGnssMode(_currentGnssMode);
-    setDynamicModel(_currentDynModel);
-    setSBASConfig(_currentSBAS);
+  // Load Preferences
+  Preferences prefs;
+  prefs.begin("laptimer", true); // Read-only
+  // Default to 7 (WIB) if not set (using -100 as sentinel for "not set")
+  // OR if set to 0 (Legacy Default), assuming User is in Indonesia and hasn't
+  // configured it.
+  int storedOffset = prefs.getInt("utc_offset", -100);
+  if (storedOffset == -100 || storedOffset == 0) {
+    _utcOffset = 7; // Default to WIB (Indonesia)
+    // Optional: We could save this back to prefs to make it permanent
+    // prefs.putInt("utc_offset", 7);
+  } else {
+    _utcOffset = storedOffset;
   }
-
-  // Initialize SD Card for Redundancy
-  SPI.begin(PIN_SD_SCLK, PIN_SD_MISO, PIN_SD_MOSI, PIN_SD_CS);
-  if (SD.begin(PIN_SD_CS)) {
-    // If internal memory is empty/zero but SD has data, recover it
-    if (_totalDistance < 0.1) {
-      if (SD.exists("/trip.txt")) {
-        File file = SD.open("/trip.txt", FILE_READ);
-        if (file) {
-          String s = file.readStringUntil('\n');
-          double sdVal = s.toDouble();
-          if (sdVal > 0)
-            file.close();
-        }
-      }
-    }
-  }
-
-  // Initialize RPM Sensor
-  // Initialize RPM Sensor
-  if (PIN_RPM_INPUT >= 0 && _rpmEnabled) {
-    pinMode(PIN_RPM_INPUT, INPUT);
-    attachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT), onPulse, FALLING);
-  }
+  prefs.end();
 }
 
 // Static Member Initialization
 volatile unsigned long GPSManager::_rpmPulses = 0;
 volatile unsigned long GPSManager::_lastPulseMicros = 0;
+volatile unsigned long GPSManager::_pulseInterval = 0;
 
 void IRAM_ATTR GPSManager::onPulse() {
   unsigned long now = micros();
-  // Debounce: 1ms (1000us) -> Max 60.000 RPM (Reduces noise significantly)
-  if (now - _lastPulseMicros > 1000) {
-    _rpmPulses++;
+  // Debounce: 2ms (2000us) -> Max 30.000 RPM (Reduces noise
+  // significantly)
+  unsigned long interval = now - _lastPulseMicros;
+  if (interval > 2000) {
     _lastPulseMicros = now;
+    _pulseInterval = interval;
+    _rpmPulses++; // Still keep track of total pulses if needed
   }
 }
 
 void GPSManager::update() {
   if (!_gpsSerial)
     return;
+
+  // Track bytes received for debug
+  static unsigned long lastDebugTime = 0;
+  static int bytesReceived = 0;
+
   while (_gpsSerial->available() > 0) {
     uint8_t c = _gpsSerial->read();
+    bytesReceived++;
+    _totalBytesReceived++; // Track total bytes for diagnostic
 
     // Invoke debug callback if set
     if (_dataCallback) {
       _dataCallback(c);
     }
 
+    // Process UBX binary protocol
+    processUBXByte(c);
+
+    // Also process with TinyGPS++ for NMEA fallback
     _gps.encode(c);
+
+    // Manual parsing of NMEA sentences for satellites in view
+    if (c == '\n') {
+      // Check if this is a GSV sentence: $GPGSV or $GNGSV
+      if (_nmeaBuffer.length() > 6 && _nmeaBuffer.startsWith("$G") &&
+          _nmeaBuffer.indexOf("GSV") == 3) {
+        // GPGSV/GNGSV format: $GPGSV,numMsgs,msgNum,totalS ats,...
+        // Field 3 is total satellites in view
+        int firstComma = _nmeaBuffer.indexOf(',');
+        if (firstComma > 0) {
+          int secondComma = _nmeaBuffer.indexOf(',', firstComma + 1);
+          if (secondComma > 0) {
+            int thirdComma = _nmeaBuffer.indexOf(',', secondComma + 1);
+            if (thirdComma > 0) {
+              String satCountStr =
+                  _nmeaBuffer.substring(secondComma + 1, thirdComma);
+              _satsInView = satCountStr.toInt();
+            }
+          }
+        }
+      }
+      _nmeaBuffer = "";
+    } else if (c != '\r') {
+      _nmeaBuffer += (char)c;
+      // Limit buffer size to prevent memory issues
+      if (_nmeaBuffer.length() > 100) {
+        _nmeaBuffer = "";
+      }
+    }
+  }
+
+  // Debug output every 5 seconds
+  // NOTE: Serial debug disabled - Serial (UART0) used for GPS on GPIO 1/3
+  if (millis() - lastDebugTime >= 5000) {
+    Serial.print("GPS bytes received (last 5s): ");
+    Serial.println(bytesReceived);
+    Serial.print("GPS fix: ");
+    Serial.println(isFixed() ? "YES" : "NO");
+    Serial.print("Satellites: ");
+    Serial.print(getSatellites());
+    Serial.print(" | Chars processed: ");
+    Serial.println(_gps.charsProcessed());
+
+    // Simplified Debug Output
+    Serial.print("GPS: Fix=");
+    Serial.print(isFixed() ? "YES" : "NO");
+    Serial.print(" Sats=");
+    Serial.println(getSatellites());
+
+    bytesReceived = 0;
+    lastDebugTime = millis();
   }
 
   // --- SYSTEM TIME REDUNDANCY ---
@@ -135,15 +211,20 @@ void GPSManager::update() {
   }
 
   // 2. Auto-Sync with GPS (if valid)
-  if (_gps.time.isValid() && _gps.date.isValid() && _gps.time.isUpdated()) {
-    // Overwrite System Time with GPS Time (UTC)
-    _sysHour = _gps.time.hour();
-    _sysMin = _gps.time.minute();
-    _sysSec = _gps.time.second();
-    _sysDay = _gps.date.day();
-    _sysMonth = _gps.date.month();
-    _sysYear = _gps.date.year();
-    // Determine ms offset? for now standard is 1Hz.
+  // Sync every second when GPS time is valid (not just when updated)
+  static unsigned long lastGpsSync = 0;
+  if (_gps.time.isValid() && _gps.date.isValid()) {
+    // Only sync once per second to avoid constant overwrites
+    if (now - lastGpsSync >= 1000) {
+      // Overwrite System Time with GPS Time (UTC)
+      _sysHour = _gps.time.hour();
+      _sysMin = _gps.time.minute();
+      _sysSec = _gps.time.second();
+      _sysDay = _gps.date.day();
+      _sysMonth = _gps.date.month();
+      _sysYear = _gps.date.year();
+      lastGpsSync = now;
+    }
   }
 
   // Update Trip Meter
@@ -169,36 +250,34 @@ void GPSManager::update() {
   if (millis() - _lastRateCheck >= 1000) {
     _currentHz = _updatesCount;
     _updatesCount = 0;
-    _updatesCount = 0;
     _lastRateCheck = millis();
   }
 
-  // --- RPM CALCULATION ---
+  // --- RPM CALCULATION (PERIOD METHOD) ---
   if (_rpmEnabled) {
-    if (millis() - _lastRpmCalcTime > 100) { // 10Hz Update
-      noInterrupts();
-      unsigned long pulses = _rpmPulses;
-      _rpmPulses = 0;
-      interrupts();
-
-      unsigned long dt = millis() - _lastRpmCalcTime;
+    if (millis() - _lastRpmCalcTime > 50) { // 20Hz Update for smoothness
       _lastRpmCalcTime = millis();
 
-      if (dt > 0) {
-        // Use cached _currentPPR
-        unsigned long rawRpm =
-            (unsigned long)((pulses * 60000.0) / (dt * _currentPPR));
+      unsigned long lastP = _lastPulseMicros;
+      unsigned long interval = _pulseInterval;
+      unsigned long nowMicros = micros();
 
-        // NOISE FILTER: Ignore absurdly low RPM (Ghost readings)
-        // Real engines don't run stable < 300 RPM.
-        // Relaxing to 50 for testing availability
-        if (rawRpm < 50) {
-          _currentRPM = 0;
-        } else {
-          _currentRPM = rawRpm;
-        }
-      } else {
+      // Timeout: 0.5s without pulse -> Engine Off/Stall (<120 RPM 4T)
+      if (nowMicros - lastP > 500000) {
         _currentRPM = 0;
+      } else if (interval > 0) {
+        // Calculate RPM: (60 sec * 1000 ms * 1000 us) / (interval * PPR)
+        // 60,000,000 / (interval * PPR)
+        float ppr = (_currentPPR > 0.1) ? _currentPPR : 1.0;
+        float instRPM = 60000000.0 / (float)(interval * ppr);
+
+        if (instRPM > 20000)
+          instRPM = 0; // Sanity check (Noise)
+
+        // Smoothing (EMA)
+        // _currentRPM = 0.7 * _currentRPM + 0.3 * instRPM;
+        // Or simpler integer smoothing
+        _currentRPM = (_currentRPM * 7 + (int)instRPM * 3) / 10;
       }
     }
   } else {
@@ -254,18 +333,24 @@ void GPSManager::setUtcOffset(int offset) {
   prefs.end();
 }
 
-bool GPSManager::isFixed() { return _gps.location.isValid(); }
+bool GPSManager::isFixed() {
+  // Return true if either UBX has a fix OR TinyGPS++ has a fix
+  return _hasValidFix || _gps.location.isValid();
+}
 
-double GPSManager::getLatitude() { return _gps.location.lat(); }
+double GPSManager::getLatitude() {
+  // Use UBX parsed data (NEO-M8N sends UBX, not NMEA)
+  return _latitude;
+}
 
-double GPSManager::getLongitude() { return _gps.location.lng(); }
+double GPSManager::getLongitude() {
+  // Use UBX parsed data (NEO-M8N sends UBX, not NMEA)
+  return _longitude;
+}
 
 float GPSManager::getSpeedKmph() {
-  // Priority 1: Use GPS speed if valid (no minimum threshold for sensitivity)
-  if (_gps.speed.isValid()) {
-    _calculatedSpeed = _gps.speed.kmph();
-    return _calculatedSpeed;
-  }
+  // Use UBX parsed speed (already in km/h)
+  return _currentSpeed;
 
   // Priority 2: Calculate speed from position changes
   if (_gps.location.isValid() && _gps.location.isUpdated()) {
@@ -314,10 +399,13 @@ void GPSManager::resetTrip() {
 }
 
 int GPSManager::getSatellites() {
-  if (_gps.satellites.isValid()) {
-    return _gps.satellites.value();
-  }
-  return 0;
+  // Use the best available satellite count
+  int sats = _satelliteCount; // From UBX
+  if (sats <= 0)
+    sats = _gps.satellites.value(); // Fallback to TinyGPS++
+  if (sats <= 0)
+    sats = _satsInView; // Fallback to manual NMEA parse
+  return sats;
 }
 
 String GPSManager::getTimeString() {
@@ -391,17 +479,20 @@ int GPSManager::getRawMinute() {
 }
 
 double GPSManager::getHDOP() {
+  // 1. Use UBX-parsed HDOP if available (valid is < 99.9)
+  if (_hdop < 99.0) {
+    return _hdop;
+  }
+  // 2. Fallback to TinyGPS++ NMEA parsing
   if (_gps.hdop.isValid()) {
     return _gps.hdop.hdop();
   }
-  return 99.9; // Tidak ada perbaikan/buruk
+  return 99.9; // Default for no fix
 }
 
 double GPSManager::getAltitude() {
-  if (_gps.altitude.isValid()) {
-    return _gps.altitude.meters();
-  }
-  return 0.0;
+  // Use UBX parsed altitude
+  return _altitude;
 }
 
 double GPSManager::getHeading() {
@@ -412,6 +503,8 @@ double GPSManager::getHeading() {
 }
 
 int GPSManager::getUpdateRate() { return _currentHz; }
+
+unsigned long GPSManager::getBytesReceived() { return _totalBytesReceived; }
 
 double GPSManager::distanceBetween(double lat1, double long1, double lat2,
                                    double long2) {
@@ -434,15 +527,15 @@ void GPSManager::setGnssMode(uint8_t mode) {
   // We construct these based on U-blox M8 protocol
   // Simplify: Trigger Cold Start or just minimal configuration?
   // Real implementation requires constructing complex payload.
-  // For this prototype, we will handle RATE mostly as it's the primary "User
-  // Visible" change Hz.
+  // For this prototype, we will handle RATE mostly as it's the primary
+  // "User Visible" change Hz.
 
   // Mapping Mode to Hz Limit
   int targetRate = 1; // Default safer 1Hz for 9600 baud
 
   // Only allow higher rates if Baud Rate is sufficient (>38400)
-  // 9600 baud can barely handle 10Hz if sentences are short, but with full
-  // NMEA it chokes. Safe limit: 1Hz for 9600.
+  // 9600 baud can barely handle 10Hz if sentences are short, but with
+  // full NMEA it chokes. Safe limit: 1Hz for 9600.
   if (_baudRate > 38400) {
     switch (mode) {
     case 0:
@@ -577,8 +670,8 @@ void GPSManager::setSBASConfig(uint8_t regionIndex) {
 
   // SBAS Configuration (UBX-CFG-SBAS 0x06 0x16)
   // We mainly want to enable/disable or set the PRN mask.
-  // For simplicity in this "Blind" implementation, we will validly toggle the
-  // system.
+  // For simplicity in this "Blind" implementation, we will validly toggle
+  // the system.
 
   // Region Index (New Order):
   // 0: EGNOS (Europe)
@@ -618,9 +711,9 @@ void GPSManager::setSBASConfig(uint8_t regionIndex) {
 
   // If we wanted to be rigorous:
   // WAAS PRNs: 131,133,135,138 -> Map to bits
-  // Since we don't have the exact bitmask function handy and don't want to
-  // break it, we assume 0 (Auto Scan) is sufficient for "Enable". Disabling
-  // (Index >= 8) allows revert to raw GPS.
+  // Since we don't have the exact bitmask function handy and don't want
+  // to break it, we assume 0 (Auto Scan) is sufficient for "Enable".
+  // Disabling (Index >= 8) allows revert to raw GPS.
 
   uint8_t ck_a = 0, ck_b = 0;
   for (int i = 2; i < 14; i++) {
@@ -843,7 +936,8 @@ void GPSManager::disableUnnecessarySentences() {
   sendUBX(disableGSA, sizeof(disableGSA));
   delay(50);
 
-  // Disable GSV (Satellites in view) - Not critical, uses lots of bandwidth
+  // Disable GSV (Satellites in view) - Not critical, uses lots of
+  // bandwidth
   uint8_t disableGSV[] = {
       0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x03, // NMEA-GxGSV
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x38  // Checksum
@@ -859,6 +953,239 @@ void GPSManager::disableUnnecessarySentences() {
   sendUBX(disableGLL, sizeof(disableGLL));
   delay(50);
 
-  // Keep enabled: GGA (Position), RMC (Recommended minimum), VTG (Track/Speed)
-  // These are essential for racing/tracking
+  // Keep enabled: GGA (Position), RMC (Recommended minimum), VTG
+  // (Track/Speed) These are essential for racing/tracking
+}
+// UBX Binary Protocol Parser Implementation
+// This file contains the UBX parser methods for GPSManager
+// Append this to the end of GPSManager.cpp
+
+void GPSManager::processUBXByte(uint8_t b) {
+  switch (_ubxState) {
+  case UBX_SYNC1:
+    if (b == 0xB5) {
+      _ubxState = UBX_SYNC2;
+    }
+    break;
+
+  case UBX_SYNC2:
+    if (b == 0x62) {
+      _ubxState = UBX_CLASS;
+      _ubxCkA = 0;
+      _ubxCkB = 0;
+    } else {
+      _ubxState = UBX_SYNC1;
+    }
+    break;
+
+  case UBX_CLASS:
+    _ubxClass = b;
+    _ubxCkA += b;
+    _ubxCkB += _ubxCkA;
+    _ubxState = UBX_ID;
+    break;
+
+  case UBX_ID:
+    _ubxId = b;
+    _ubxCkA += b;
+    _ubxCkB += _ubxCkA;
+    _ubxState = UBX_LEN1;
+    break;
+
+  case UBX_LEN1:
+    _ubxLength = b;
+    _ubxCkA += b;
+    _ubxCkB += _ubxCkA;
+    _ubxState = UBX_LEN2;
+    break;
+
+  case UBX_LEN2:
+    _ubxLength |= (b << 8);
+    _ubxCkA += b;
+    _ubxCkB += _ubxCkA;
+    _ubxPayloadIndex = 0;
+    _ubxState = (_ubxLength > 0) ? UBX_PAYLOAD : UBX_CK_A;
+    break;
+
+  case UBX_PAYLOAD:
+    // Always store byte if space exists
+    if (_ubxPayloadIndex < sizeof(_ubxPayload)) {
+      _ubxPayload[_ubxPayloadIndex] = b;
+    }
+    // Always increment index to track progress against _ubxLength
+    _ubxPayloadIndex++;
+
+    _ubxCkA += b;
+    _ubxCkB += _ubxCkA;
+
+    if (_ubxPayloadIndex >= _ubxLength) {
+      // Packet Complete
+      _ubxState = UBX_CK_A;
+    }
+    break;
+
+  case UBX_CK_A:
+    // We already calculated _ubxCkA from payload.
+    // The byte b IS the received CK_A.
+    // Wait, the calculated values include Class, ID, Len, Payload.
+    // We compare calculated _ubxCkA with received b.
+    if (b == _ubxCkA) {
+      _ubxState = UBX_CK_B;
+    } else {
+      _ubxState = UBX_SYNC1; // Fail
+    }
+    break;
+
+  case UBX_CK_B:
+    if (b == _ubxCkB) {
+      // Valid Packet!
+      if (_ubxClass == 0x01 && _ubxId == 0x07) {
+        parseUBXNavPvt();
+      } else if (_ubxClass == 0x01 && _ubxId == 0x35) {
+        parseUBXNavSat();
+      }
+    }
+    _ubxState = UBX_SYNC1;
+    break;
+  }
+}
+
+void GPSManager::parseUBXNavSat() {
+  uint8_t numSats = _ubxPayload[5];
+
+  // DEBUG
+  // Serial.print("NAV-SAT: Sats=");
+  // Serial.println(numSats);
+
+  _satellites.clear();
+
+  // Safety check
+  if (numSats > 50)
+    return;
+
+  int offset = 8;
+  for (int i = 0; i < numSats; i++) {
+    if (offset + 12 > _ubxLength)
+      break;
+    if (offset + 12 > sizeof(_ubxPayload))
+      break; // Buffer safety
+
+    SatelliteInfo sat;
+    sat.id = _ubxPayload[offset + 1];
+    sat.snr = _ubxPayload[offset + 2];
+    sat.elevation = (int8_t)_ubxPayload[offset + 3];
+    sat.azimuth =
+        (int16_t)(_ubxPayload[offset + 4] | (_ubxPayload[offset + 5] << 8));
+
+    _satellites.push_back(sat);
+
+    offset += 12;
+  }
+}
+
+void GPSManager::parseUBXNavPvt() {
+  if (_ubxLength < 92)
+    return; // Invalid UBX-NAV-PVT message
+
+  // Extract fix type (offset 20)
+  uint8_t fixType = _ubxPayload[20];
+  _hasValidFix = (fixType == 0x02 || fixType == 0x03); // 2D or 3D fix
+
+  // Extract satellite count (offset 23)
+  _satelliteCount = _ubxPayload[23];
+
+  // Extract longitude (offset 24, 4 bytes, little-endian, 1e-7 degrees)
+  int32_t lonRaw = *((int32_t *)(&_ubxPayload[24]));
+  _longitude = lonRaw / 10000000.0;
+
+  // Extract latitude (offset 28, 4 bytes, little-endian, 1e-7 degrees)
+  int32_t latRaw = *((int32_t *)(&_ubxPayload[28]));
+  _latitude = latRaw / 10000000.0;
+
+  // Extract altitude MSL (offset 36, 4 bytes, mm)
+  int32_t altRaw = *((int32_t *)(&_ubxPayload[36]));
+  _altitude = altRaw / 1000.0; // Convert mm to meters
+
+  // Extract ground speed (offset 60, 4 bytes, mm/s)
+  int32_t speedRaw = *((int32_t *)(&_ubxPayload[60]));
+  _currentSpeed = (speedRaw / 1000.0) * 3.6; // Convert mm/s to km/h
+
+  // Extract heading (offset 64, 4 bytes, 1e-5 degrees)
+  int32_t headRaw = *((int32_t *)(&_ubxPayload[64]));
+  _heading = headRaw / 100000.0;
+
+  // Extract PDOP (offset 76, 2 bytes, 0.01)
+  uint16_t pdopRaw = *((uint16_t *)(&_ubxPayload[76]));
+  _hdop = pdopRaw / 100.0;
+
+  // Extract date/time if valid (offset 11 - valid flags)
+  // Bit 0: Valid Date, Bit 1: Valid Time. Both must be 1 (0x03)
+  if ((_ubxPayload[11] & 0x03) == 0x03) { // Valid Date & Time
+    uint16_t year = *((uint16_t *)(&_ubxPayload[4]));
+    uint8_t month = _ubxPayload[6];
+    uint8_t day = _ubxPayload[7];
+    uint8_t hour = _ubxPayload[8];
+    uint8_t min = _ubxPayload[9];
+    uint8_t sec = _ubxPayload[10];
+
+    // Update system time (Internal is ALWAYS UTC)
+    _sysYear = year;
+    _sysMonth = month;
+    _sysDay = day;
+    _sysHour = hour; // Keep as raw UTC internally
+    _sysMin = min;
+    _sysSec = sec;
+  }
+
+  // Update counters
+  _updatesCount++;
+  _lastUpdateTime = millis();
+}
+
+bool GPSManager::detectBaudRate() {
+  int rates[] = {9600, 19200, 38400, 57600, 115200};
+
+  Serial.println("GPS: Auto-detecting baud rate...");
+
+  for (int i = 0; i < 5; i++) {
+    int rate = rates[i];
+    Serial.print("Trying ");
+    Serial.print(rate);
+    Serial.print("... ");
+
+    _gpsSerial->begin(rate, SERIAL_8N1, _rxPin, _txPin);
+    unsigned long start = millis();
+    bool validDataFound = false;
+
+    uint8_t lastChar = 0;
+    while (millis() - start < 500) { // Listen for 500ms
+      if (_gpsSerial->available()) {
+        uint8_t c = _gpsSerial->read();
+
+        // Check for UBX Sync (0xB5 0x62)
+        if (lastChar == 0xB5 && c == 0x62) {
+          validDataFound = true;
+          break;
+        }
+        // Check for NMEA Start ($G)
+        if (lastChar == '$' && c == 'G') {
+          validDataFound = true;
+          break;
+        }
+        lastChar = c;
+      }
+    }
+
+    if (validDataFound) {
+      Serial.println("FOUND!");
+      _baudRate = rate;
+      // Keep Serial2 open at this rate
+      return true;
+    } else {
+      Serial.println("No valid data.");
+      _gpsSerial->end();
+      delay(50); // Small pause
+    }
+  }
+  return false;
 }

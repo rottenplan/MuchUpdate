@@ -274,6 +274,49 @@ void GpsStatusScreen::drawStatus() {
     tft->drawString("N", cX, cY - r - 5);
   }
 
+  // --- DRAW SATELLITES (Dots) ---
+  // Redraw every time (clean radar first if needed, but for now just additive)
+  // Ideally we should clear the radar circle area if we want to animate,
+  // but let's stick to forceRedraw or Periodic updates.
+  // Actually, to prevent ghosting, we should clear the radar area if we have
+  // changes. For now, let's rely on forceRedraw trigger from update() changes.
+
+  if (forceRedraw || sats != _lastSats || hz != _lastHz) {
+    // Clear Radar Area (Inside)
+    tft->fillCircle(cX, cY, r - 1, TFT_BLACK);
+    // Re-draw crosshair
+    tft->drawLine(cX - r, cY, cX + r, cY, TFT_DARKGREY);
+    tft->drawLine(cX, cY - r, cX, cY + r, TFT_DARKGREY);
+
+    std::vector<SatelliteInfo> satData = gpsManager.getSatellitesData();
+    for (const auto &sat : satData) {
+      if (sat.elevation < 0)
+        continue;
+
+      // Polar to Cartesian
+      // Radius: 0 (Center/90deg) to r (Edge/0deg)
+      float rad = r * (1.0 - (sat.elevation / 90.0));
+
+      // Angle: Azimuth 0 is North (Up). Math 0 is East (Right).
+      // Theta = (Azimuth - 90) * DEG_TO_RAD
+      float angle = (sat.azimuth - 90) * DEG_TO_RAD;
+
+      int sx = cX + (rad * cos(angle));
+      int sy = cY + (rad * sin(angle));
+
+      // Color by SNR (0-99)
+      uint16_t dotColor = TFT_RED;
+      if (sat.snr > 35)
+        dotColor = TFT_GREEN;
+      else if (sat.snr > 25)
+        dotColor = TFT_YELLOW;
+      else if (sat.snr > 15)
+        dotColor = TFT_ORANGE;
+
+      tft->fillCircle(sx, sy, 2, dotColor);
+    }
+  }
+
   if (!_lastFixed) {
     // Logic for satellites if we had them or just static crosshair
     _lastFixed = true;

@@ -20,14 +20,20 @@ void GnssLogScreen::onShow() {
   _needsRedraw = true;
 
   // --- 1. HEADER ---
-  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
+  // --- 1. HEADER ---
+  // Status Bar Height is typically 25. Move header below it.
+  int headerY = STATUS_BAR_HEIGHT;
+  int lineY = headerY + 25; // Line under title
+
+  tft->drawFastHLine(0, lineY, SCREEN_WIDTH, COLOR_SECONDARY);
 
   // Title
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextDatum(TC_DATUM);
+  tft->setTextDatum(MC_DATUM); // Middle Center
   tft->setFreeFont(&Org_01);
-  tft->setTextSize(2); // Match Session Summary
-  tft->drawString("GPS LOG", SCREEN_WIDTH / 2, 28);
+  tft->setTextSize(2);
+  tft->drawString("GPS LOG", SCREEN_WIDTH / 2,
+                  headerY + 12); // Centered between Status Bar and Line
 
   // Back Button (Blue Triangle) - Bottom Left
   tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
@@ -37,6 +43,7 @@ void GnssLogScreen::onShow() {
   drawCheckboxes();
 
   // --- 3. LOG CARD ---
+
   // Widened for 480x320: W=440 (Centered: X=20)
   tft->fillRoundRect(20, 95, 440, 180, 8, 0x18E3);
   tft->drawRoundRect(20, 95, 440, 180, 8, TFT_DARKGREY);
@@ -46,20 +53,27 @@ void GnssLogScreen::onShow() {
     if (_paused)
       return;
 
-    if (c == '\n' || c == '\r') {
+    _lastDataTime = millis(); // Update timestamp for connection status
+
+    // Ignore CR, handle LF as line break
+    if (c == '\r')
+      return;
+
+    if (c == '\n') {
       if (_buffer.length() > 0) {
-        // Truncate to fit new box width (440px -> ~60 chars)
-        if (_buffer.length() > 60) {
-          _buffer = _buffer.substring(0, 60);
+        // Truncate to fit box width (440px -> ~70 chars at font size 1)
+        if (_buffer.length() > 70) {
+          _buffer = _buffer.substring(0, 70);
         }
         _lines.push_back(_buffer);
-        if (_lines.size() > 14) // Max 14 lines for H=180
+        if (_lines.size() > 13) // Max 13 lines with 12px spacing for H=180
           _lines.erase(_lines.begin());
         _buffer = "";
         _needsRedraw = true; // Trigger redraw
       }
     } else {
-      if (_buffer.length() < 50)
+      // Only accept printable ASCII characters (32-126)
+      if (_buffer.length() < 70 && c >= 32 && c <= 126)
         _buffer += (char)c; // Prevent infinite growth
     }
   });
@@ -181,7 +195,8 @@ void GnssLogScreen::update() {
     }
   }
 
-  // Status Indicator
+  // Status Indicator - REMOVED (redundant)
+  /*
   bool connected = (millis() - _lastDataTime < 1000) && (_lastDataTime != 0);
   if (connected != _lastStatusConnected) {
     _lastStatusConnected = connected;
@@ -191,15 +206,16 @@ void GnssLogScreen::update() {
     TFT_eSPI *tft = _ui->getTft();
     tft->setTextSize(1);
     tft->setTextDatum(TR_DATUM);
-    // Draw status at top right, aligned with checks Y=35
+    // Draw status below log box (log ends at Y=275, add margin)
     if (connected) {
       tft->setTextColor(TFT_GREEN, TFT_BLACK);
-      tft->drawString("GPS: CONNECTED  ", SCREEN_WIDTH - 10, 35);
+      tft->drawString("GPS: CONNECTED  ", SCREEN_WIDTH - 10, 280);
     } else {
       tft->setTextColor(TFT_RED, TFT_BLACK);
-      tft->drawString("GPS: NO DATA    ", SCREEN_WIDTH - 10, 35);
+      tft->drawString("GPS: NO DATA    ", SCREEN_WIDTH - 10, 280);
     }
   }
+  */
 
   static unsigned long lastDrawTime = 0;
   if (_needsRedraw && (millis() - lastDrawTime > 300)) { // Throttle to ~3 FPS
@@ -220,15 +236,15 @@ void GnssLogScreen::drawLines() {
   // Green text for logs
   tft->setTextColor(TFT_GREEN, 0x18E3);
   tft->setTextDatum(TL_DATUM);
-  tft->setTextPadding(420); // Widened
+  tft->setTextPadding(420); // Full width padding
 
-  // Margin 10px from X=20 -> X=30. Y=100.
+  // Margin 10px from X=20 -> X=30. Y=102 (better vertical centering)
   int innerX = 30;
-  int innerY = 100;
+  int innerY = 102;
 
   int y = innerY;
   for (const auto &line : _lines) {
     tft->drawString(line, innerX, y);
-    y += 10; // Standard spacing
+    y += 12; // Improved spacing (13 lines * 12px = 156px < 180px)
   }
 }

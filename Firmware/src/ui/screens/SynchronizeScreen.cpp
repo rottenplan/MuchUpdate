@@ -147,8 +147,13 @@ void SynchronizeScreen::handleTouch(int x, int y) {
   }
 
   // Sync Button Area (Bottom Position)
-  // BtnY = 200, BtnH = 50 -> Touch Y: 190 to 260 approx
-  if (!_isSyncing && y >= 190 && y <= 260) {
+  // BtnW = 240, BtnX = (SCREEN_WIDTH - 240)/2 = 120
+  // BtnY = 200, BtnH = 50
+  // Touch Area: X=120-360, Y=190-260
+  int btnW = 240;
+  int btnX = (SCREEN_WIDTH - btnW) / 2;
+
+  if (!_isSyncing && y >= 190 && y <= 260 && x >= btnX && x <= (btnX + btnW)) {
     _isSyncing = true;
     _statusMessage = "CONNECTING...";
     _detailMessage = "Checking WiFi...";
@@ -219,6 +224,9 @@ void SynchronizeScreen::performSync() {
     _detailMessage = "Upload Failed";
     _lastSyncSuccess = true;
   } else {
+    _statusMessage = "SYNC FAILED";
+    _detailMessage = "Check Connection/Auth";
+    _lastSyncSuccess = false;
   }
 
   _isSyncing = false;

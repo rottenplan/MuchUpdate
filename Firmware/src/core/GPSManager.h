@@ -6,6 +6,15 @@
 #include <SD.h>
 #include <SPI.h> // Ensure SPI is included
 #include <TinyGPS++.h>
+#include <functional>
+#include <vector>
+
+struct SatelliteInfo {
+  uint8_t id;
+  int16_t elevation; // 0-90
+  int16_t azimuth;   // 0-360
+  uint8_t snr;       // Signal Strength
+};
 
 class GPSManager {
 public:
@@ -38,6 +47,10 @@ public:
   double getAltitude();
   double getHeading();
   int getUpdateRate();
+  std::vector<SatelliteInfo> getSatellitesData() { return _satellites; }
+
+  // DIAGNOSTIC: Get total bytes received from GPS
+  unsigned long getBytesReceived();
 
   // Configuration
   void setGnssMode(uint8_t mode);
@@ -61,6 +74,7 @@ public:
 
   // Pin Configuration
   void setPins(int rx, int tx);
+  bool detectBaudRate();
   int getRxPin() { return _rxPin; }
   int getTxPin() { return _txPin; }
 
@@ -82,7 +96,12 @@ private:
   HardwareSerial *_gpsSerial;
   void sendUBX(const uint8_t *cmd, int len);
   void configureGpsBaud(int targetBaud);
+  void configureGnssConstellations(uint8_t modeIndex);
   void disableUnnecessarySentences(); // Optimize GPS bandwidth
+
+  // Manual satellite tracking from raw NMEA
+  int _satsInView = 0;
+  String _nmeaBuffer = "";
 
   RawDataCallback _dataCallback = nullptr;
 
@@ -90,6 +109,19 @@ private:
   int _rxPin = PIN_GPS_RX; // Default from config.h
   int _txPin = PIN_GPS_TX;
   int _baudRate = GPS_BAUD; // Default 9600
+
+  // GPS Data (from UBX or NMEA)
+  bool _hasValidFix = false;
+  int _satelliteCount = 0;
+  double _latitude = 0.0;
+  double _longitude = 0.0;
+  double _altitude = 0.0;
+  double _currentSpeed = 0.0;
+  double _heading = 0.0;
+  double _hdop = 99.9;
+  unsigned long _lastUpdateTime = 0;
+  unsigned long _totalBytesReceived =
+      0; // DIAGNOSTIC: Track total bytes from GPS
 
   double _totalDistance = 0.0;
   double _lastLat = 0.0;
@@ -130,9 +162,38 @@ private:
   int _utcOffset = 0;
   unsigned long _lastTick = 0;
 
+  // UBX Parser State Machine
+  enum UBXState {
+    UBX_SYNC1,
+    UBX_SYNC2,
+    UBX_CLASS,
+    UBX_ID,
+    UBX_LEN1,
+    UBX_LEN2,
+    UBX_PAYLOAD,
+    UBX_CK_A,
+    UBX_CK_B
+  };
+
+  UBXState _ubxState = UBX_SYNC1;
+  uint8_t _ubxClass = 0;
+  uint8_t _ubxId = 0;
+  uint16_t _ubxLength = 0;
+  uint16_t _ubxPayloadIndex = 0;
+  uint8_t _ubxPayload[500]; // Buffer for UBX-NAV-PVT (92) & UBX-NAV-SAT (~300+)
+  uint8_t _ubxCkA = 0;
+  uint8_t _ubxCkB = 0;
+
+  // UBX Parser Methods
+  void processUBXByte(uint8_t b);
+  void parseUBXNavPvt();
+  void parseUBXNavSat();
+  std::vector<SatelliteInfo> _satellites;
+
   // RPM Logic
   static volatile unsigned long _rpmPulses;
   static volatile unsigned long _lastPulseMicros;
+  static volatile unsigned long _pulseInterval;
   unsigned long _lastRpmCalcTime = 0;
 
 public:

@@ -22,7 +22,9 @@ enum ScreenType {
   SCREEN_GPS_STATUS,
   SCREEN_SYNCHRONIZE,
   SCREEN_GNSS_LOG,
-  SCREEN_WEB_SERVER
+  SCREEN_WEB_SERVER,
+  SCREEN_GPS_DEBUG,  // GPS Debug screen
+  SCREEN_TOUCH_DEBUG // Touch Debug screen
 };
 
 // ...
@@ -106,6 +108,8 @@ private:
   UserScreen *_synchronizeScreen;
   UserScreen *_gnssLogScreen;
   UserScreen *_webServerScreen;
+  UserScreen *_gpsDebugScreen;   // GPS Debug screen
+  UserScreen *_touchDebugScreen; // Touch Debug screen
 
   String _screenTitle; // Added title
 

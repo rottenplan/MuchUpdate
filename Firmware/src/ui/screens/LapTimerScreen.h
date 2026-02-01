@@ -40,6 +40,7 @@ enum LapTimerState {
   STATE_RECORD_TRACK,
   STATE_CREATE_TRACK,
   STATE_RENAME_TRACK,
+  STATE_SAVE_TRACK,
   STATE_NO_GPS
 };
 enum RaceMode { MODE_BEST, MODE_LAST, MODE_PREDICTIVE };
@@ -85,11 +86,12 @@ private:
   void drawTrackList();
   void drawTrackOptionsPopup();
   void drawTrackDetails();
-  void drawSearching();         // New Searching Screen
-  void drawRecordTrackStatic(); // Static part of Record UI
-  void drawRecordTrack();       // Dynamic part of Record UI
-  void drawCreateTrack();       // Track Creator Wizard
-  void drawRenameTrack();       // Renaming UI
+  void drawSearching();                       // New Searching Screen
+  void drawRecordTrackStatic();               // Static part of Record UI
+  void drawRecordTrack();                     // Dynamic part of Record UI
+  void drawCreateTrack();                     // Track Creator Wizard
+  void drawRenameTrack(bool force = false);   // Renaming UI
+  void drawSaveTrackName(bool force = false); // Save Naming UI
   void drawNoGPS();
 
   // Lap Data

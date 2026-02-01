@@ -21,24 +21,19 @@ void sdProgressCallback(int percent, String status) {
 
   // Draw Status
   static_tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  // static_tft is just a TFT pointer. We don't have UIManager instance here.
-  // We can't easily fix this callback without passing UIManager.
-  // But let's assume this callback handles its own colors or we skip it for
-  // now. Actually, we can assume standard colors for now or try to use macros
-  // if we redefine them. But the user said "only statusbar changed". Let's
-  // focus on the main class methods first.
   static_tft->setTextDatum(TC_DATUM); // Top Center
   static_tft->setTextSize(1);
   static_tft->setFreeFont(&Org_01);
 
   // Clear text area (approx y=100-120)
-  static_tft->fillRect(0, 100, 320, 30, COLOR_BG);
-  static_tft->drawString(status, 320 / 2, 110);
+  // Use SCREEN_WIDTH (480) for centering
+  static_tft->fillRect(0, 100, SCREEN_WIDTH, 30, COLOR_BG);
+  static_tft->drawString(status, SCREEN_WIDTH / 2, 110);
 
   // Draw Bar
-  int barW = 200;
-  int barH = 10;
-  int barX = (320 - barW) / 2;
+  int barW = 300; // Wider bar for 480px screen
+  int barH = 12;
+  int barX = (SCREEN_WIDTH - barW) / 2;
   int barY = 140;
 
   // Outline
@@ -267,14 +262,14 @@ void SettingsScreen::loadSettings() {
 
     // 6. GNSS RX PIN
     SettingItem rxPin = {"GNSS RX PIN", TYPE_VALUE, "gps_rx_pin"};
-    // Options: 17, 16, 1, 3
-    rxPin.options = {"17 (Def)", "16", "1 (TX0)", "3 (RX0)"};
+    // Options: 22(Def), 21
+    rxPin.options = {"22 (Def)", "21"};
 
     extern GPSManager gpsManager;
     int curRx = gpsManager.getRxPin();
-    rxPin.currentOptionIdx = 0; // Default 17
-    int validRxCheck[] = {17, 16, 1, 3};
-    for (int i = 0; i < 4; i++) {
+    rxPin.currentOptionIdx = 0; // Default 22
+    int validRxCheck[] = {22, 21};
+    for (int i = 0; i < 2; i++) {
       if (validRxCheck[i] == curRx) {
         rxPin.currentOptionIdx = i;
         break;
@@ -284,11 +279,12 @@ void SettingsScreen::loadSettings() {
 
     // 7. GNSS TX PIN
     SettingItem txPin = {"GNSS TX PIN", TYPE_VALUE, "gps_tx_pin"};
-    txPin.options = {"17 (Def)", "16", "1 (TX0)", "3 (RX0)"};
+    // Options: 21(Def), 22
+    txPin.options = {"21 (Def)", "22"};
     int curTx = gpsManager.getTxPin();
-    txPin.currentOptionIdx = 0; // Default 17
-    int validTxCheck[] = {17, 16, 1, 3};
-    for (int i = 0; i < 4; i++) {
+    txPin.currentOptionIdx = 0; // Default 21
+    int validTxCheck[] = {21, 22};
+    for (int i = 0; i < 2; i++) {
       if (validTxCheck[i] == curTx) {
         txPin.currentOptionIdx = i;
         break;
@@ -311,6 +307,8 @@ void SettingsScreen::loadSettings() {
     }
     _settings.push_back(baud);
 
+    _settings.push_back({"GPS DEBUG", TYPE_ACTION});
+
     _prefs.end();
 
   } else if (_currentMode == MODE_UTILITY) {
@@ -321,6 +319,9 @@ void SettingsScreen::loadSettings() {
 
     // TFT Benchmark (Standard)
     _settings.push_back({"TFT BENCHMARK", TYPE_ACTION});
+
+    // Touch Debug (Removed per user request)
+    // _settings.push_back({"TOUCH DEBUG", TYPE_ACTION});
 
     _prefs.end();
   }
@@ -423,11 +424,13 @@ void SettingsScreen::saveSetting(int idx) {
       int newTx = gpsManager.getTxPin();
 
       if (item.key == "gps_rx_pin") {
-        if (item.currentOptionIdx >= 0 && item.currentOptionIdx < 4)
+        int validRxCheck[] = {22, 21};
+        if (item.currentOptionIdx >= 0 && item.currentOptionIdx < 2)
           newRx = validRxCheck[item.currentOptionIdx];
       }
       if (item.key == "gps_tx_pin") {
-        if (item.currentOptionIdx >= 0 && item.currentOptionIdx < 4)
+        int validTxCheck[] = {21, 22};
+        if (item.currentOptionIdx >= 0 && item.currentOptionIdx < 2)
           newTx = validTxCheck[item.currentOptionIdx];
       }
 
@@ -798,6 +801,9 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "OFFLINE SERVER") {
       _ui->switchScreen(SCREEN_WEB_SERVER);
       return;
+    } else if (item.name == "GPS DEBUG") {
+      _ui->switchScreen(SCREEN_GPS_DEBUG);
+      return;
     } else if (item.name == "ENGINE HOURS") {
       _currentMode = MODE_ENGINE;
       loadSettings();
@@ -909,11 +915,20 @@ void SettingsScreen::handleTouch(int idx) {
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
       _ui->drawStatusBar(true);
 
-      tft->setTextColor(TFT_YELLOW, _ui->getBackgroundColor());
+      // --- 1. PROCESSING CARD ---
+      int cardW = 280;
+      int cardH = 100;
+      int cardX = (SCREEN_WIDTH - cardW) / 2;
+      int cardY = (SCREEN_HEIGHT - cardH) / 2;
+
+      tft->fillRoundRect(cardX, cardY, cardW, cardH, 8, 0x18E3); // Charcoal
+      tft->drawRoundRect(cardX, cardY, cardW, cardH, 8, TFT_DARKGREY);
+
+      tft->setTextColor(TFT_WHITE, 0x18E3);
       tft->setTextDatum(MC_DATUM);
-      tft->setTextFont(2); // Use Standard Font 2 (Sans Serif)
+      tft->setTextFont(2);
       tft->setTextSize(1);
-      tft->drawString("Removing Account...", SCREEN_WIDTH / 2, 100);
+      tft->drawString("Removing Account...", SCREEN_WIDTH / 2, cardY + 50);
 
       // Clear user credentials from NVS
       _prefs.begin("muchrace", false);
@@ -925,20 +940,22 @@ void SettingsScreen::handleTouch(int idx) {
       _prefs.clear();
       _prefs.end();
 
-      delay(1000);
+      delay(1500);
 
-      // Show confirmation
-      tft->fillRect(0, 80, SCREEN_WIDTH, 120, COLOR_BG); // Clear larger area
-      tft->setTextColor(TFT_GREEN, COLOR_BG);
-      tft->setTextFont(2); // Ensure Font 2
-      tft->drawString("Account Removed!", SCREEN_WIDTH / 2, 100);
-      tft->setTextColor(TFT_WHITE, COLOR_BG);
-      tft->drawString("Device will restart", SCREEN_WIDTH / 2, 130);
-      tft->drawString("on next setup...", SCREEN_WIDTH / 2, 150);
+      // --- 2. SUCCESS CARD ---
+      // Redraw refined background or just overdraw card
+      tft->fillRoundRect(cardX, cardY, cardW, cardH, 8, 0x18E3); // Re-fill
+      tft->drawRoundRect(cardX, cardY, cardW, cardH, 8,
+                         TFT_GREEN); // Green Border
 
-      delay(3000);
+      tft->setTextColor(TFT_GREEN, 0x18E3);
+      tft->setTextFont(4); // Large Font
+      tft->drawString("SUCCESS", SCREEN_WIDTH / 2, cardY + 35);
 
-      // Return to settings menu
+      tft->setTextColor(TFT_SILVER, 0x18E3);
+      tft->setTextFont(2);
+      tft->drawString("Restarting Device...", SCREEN_WIDTH / 2, cardY + 70);
+
       delay(3000);
 
       // Automatic Restart
@@ -971,6 +988,10 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "TFT BENCHMARK") {
       _currentMode = MODE_GRAPHIC_TEST;
       startGraphicTest();
+      return;
+      // } else if (item.name == "TOUCH DEBUG") {
+      //   _ui->switchScreen(SCREEN_TOUCH_DEBUG);
+      //   return;
     } else if (item.name == "SD CARD TEST") {
       _currentMode = MODE_SD_TEST;
       _ui->setTitle("SD CARD TEST");

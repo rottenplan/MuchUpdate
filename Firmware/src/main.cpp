@@ -24,13 +24,16 @@ SyncManager syncManager;
 // SPIClass touchSpi = SPIClass(HSPI); // Tidak diperlukan untuk I2C
 
 void setup() {
-  // Serial.begin(115200); // Disabled to allow GPS on Pins 1 & 3
-  // Serial.println("Starting RaceBox Clone...");
+  Serial.begin(115200); // Standard PC Debugging on GPIO 1/3
+  Serial.println("Starting RaceBox Clone...");
 
   // Inisialisasi Pin
   // Force Backlight OFF immediately to prevent startup glitches
   pinMode(PIN_TFT_BL, OUTPUT);
   digitalWrite(PIN_TFT_BL, LOW);
+
+  // SAFETY: Ensure Pin 21 (Touch Int) is not driven High by default
+  pinMode(21, INPUT_PULLUP);
 
   // Inisialisasi UI (TFT)
   tft.init();
@@ -73,7 +76,7 @@ void setup() {
   uiManager.setTouch(&touch); // Teruskan objek sentuh ke UI
   uiManager.begin();
 
-  // Serial.println("System Ready");
+  // Serial.println("System Ready"); // DISABLED: Serial used for GPS
 }
 
 void loop() {
