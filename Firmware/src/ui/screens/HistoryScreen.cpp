@@ -35,8 +35,8 @@ void HistoryScreen::onShow() {
   tft->setTextSize(FONT_SIZE_MENU_TITLE);
   tft->drawString("HISTORY", SCREEN_WIDTH / 2, 28);
 
-  // Back Button (Blue Triangle) - Bottom Left (Moved down for 320h)
-  tft->fillTriangle(10, 290, 22, 284, 22, 296, TFT_BLUE);
+  // Back Button (Blue Triangle) - Bottom Left
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, TFT_BLUE);
 
   drawMenu();
 }
@@ -149,10 +149,8 @@ void HistoryScreen::update() {
       int tx = _touchStartX;
       int ty = _touchStartY;
 
-      // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log
-      // style
-      // Global Back Button (Bottom Left < 60, > 180) - Matching GNSS Log style
-      if (tx < 60 && ty > 180) {
+      // 1. Tombol Kembali (Bottom Left area)
+      if (p.x < 100 && p.y > 240) {
         // Single Tap Logic
         if (_currentMode == MODE_MENU) {
           _ui->switchScreen(SCREEN_MENU);
@@ -253,7 +251,7 @@ void HistoryScreen::update() {
           int skip = 0;
           int targetIdx = -1;
           for (int i = 0; i < _historyList.size(); i++) {
-            if (_historyList[i].type == _selectedType) {
+            if (_historyList[i].type != _selectedType) {
               if (_historyList[i].date.length() >= 10) {
                 String g = _historyList[i].date.substring(6, 10) + "-" +
                            _historyList[i].date.substring(3, 5);
@@ -636,7 +634,7 @@ void HistoryScreen::drawList(int scrollOffset) {
   }
 
   // Back Triangle
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, TFT_BLUE);
 }
 
 void HistoryScreen::scanGroups() {
@@ -671,6 +669,8 @@ void HistoryScreen::drawOptions() {
 
   // Header
   tft->drawFastHLine(0, 20, SCREEN_WIDTH, TFT_WHITE);
+  // Back Arrow (Standardized Bottom-Left)
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
@@ -701,8 +701,9 @@ void HistoryScreen::drawOptions() {
     tft->drawString(options[i], SCREEN_WIDTH / 2, y + h / 2);
   }
 
-  // Back Triangle
-  tft->fillTriangle(10, 290, 22, 284, 22, 296, TFT_BLUE);
+  // Back Triangle (Standardized Bottom-Left)
+  // tft->fillTriangle(10, 290, 25, 282, 25, 298, TFT_BLUE); // This line is
+  // removed as it's moved above
 }
 
 void HistoryScreen::drawViewData() {
@@ -773,6 +774,8 @@ void HistoryScreen::drawViewData() {
 
     // 0-60
     tft->fillRoundRect(10, startY, boxW, boxH, 8, 0x18E3);
+    // BACK Button (Bottom-Left)
+    tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
     tft->drawString("0-60 KPH", 15, startY + 5);

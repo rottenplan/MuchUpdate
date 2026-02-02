@@ -120,6 +120,7 @@ private:
   void checkFinishLine();
   void saveNewTrack(String name, double sLat, double sLon, double fLat,
                     double fLon);
+  void finalizeRaceSession();
   void renameTrack(int index, String newName);
 
   // Race Screen Helpers
@@ -138,6 +139,9 @@ private:
   RecordingState _lastRecordedStateRender = (RecordingState)-1;
   long _lastLastLapTimeRender = -1;
   long _lastBestLapTimeRender = -1;
+  float _maxSpeedSession = 0.0;
+  float _maxSpeedSessionRender = -1.0;
+  unsigned long _maxRpmSessionRender = 0;
 
   // Predictive Timing
   float _currentDelta = 0.0;

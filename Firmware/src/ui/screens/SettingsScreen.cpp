@@ -531,160 +531,110 @@ void SettingsScreen::update() {
     return;
   }
 
-  // Tombol Kembali (Bottom-Left corner, y > 210)
-  if (p.x < 80 && p.y > 210) {
+  // 1. Footer Buttons Zone (Standardized Bottom-Bar y > 260)
+  if (p.y > 260) {
     if (millis() - lastSettingTouch < 200)
       return;
     lastSettingTouch = millis();
 
-    static unsigned long lastBackTap = 0;
-    if (millis() - lastBackTap < 500) {
-      lastBackTap = 0;
+    // A. Tombol Kembali (Bottom-Left)
+    if (p.x < 120) {
       // Visual Feedback (Selection)
       if (_selectedIdx != -2) {
         _selectedIdx = -2;
         drawList(_scrollOffset, false);
       }
 
-      // Logic Back
+      // Logic Back (Single Tap)
       if (_currentMode == MODE_MAIN) {
         _ui->switchScreen(SCREEN_MENU);
-        return; // Exit immediately, do not redraw
+        return;
       } else if (_currentMode == MODE_WIFI_MENU) {
-        // Return to Main
         _currentMode = MODE_MAIN;
         _ui->setTitle("SETTINGS");
         loadSettings();
-        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-        _ui->drawStatusBar(true);
-        _scrollOffset = 0;
-        _ui->drawStatusBar(true);
-        _scrollOffset = 0;
-        drawList(0, true);
       } else if (_currentMode == MODE_ENGINE) {
-        // Return to RPM Menu
         _currentMode = MODE_RPM;
         _ui->setTitle("RPM SETTINGS");
         loadSettings();
-        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-        _ui->drawStatusBar(true);
-        _scrollOffset = 0;
-        drawList(0, true);
-        _scrollOffset = 0;
-        drawList(0, true);
       } else if (_currentMode == MODE_UTILITY) {
-        // Return to Main Settings
         _currentMode = MODE_MAIN;
         _ui->setTitle("SETTINGS");
         loadSettings();
-        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-        _ui->drawStatusBar(true);
-        _scrollOffset = 0;
-        drawList(0, true);
       } else if (_currentMode == MODE_GRAPHIC_TEST) {
-        // Return to Utility Menu
         endGraphicTest();
         _currentMode = MODE_UTILITY;
         _ui->setTitle("UTILITY");
         loadSettings();
-        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-        _ui->drawStatusBar(true);
-        _scrollOffset = 0;
-        drawList(0, true);
       } else {
-        // Return to Main Settings
         _currentMode = MODE_MAIN;
         _ui->setTitle("SETTINGS");
         loadSettings();
-        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-        _ui->drawStatusBar(true);
-        _scrollOffset = 0;
-        drawList(0, true);
       }
-    } else {
-      lastBackTap = millis();
-    }
-    return;
-  }
 
-  // Scroll Down Button (Bottom-Right, y > 210, x > 290)
-  if (p.x > 290 && p.y > 210) {
-    if (millis() - lastSettingTouch < 200)
+      _scrollOffset = 0;
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
       return;
-    lastSettingTouch = millis();
-
-    int listY = 30;
-    int itemH = 20;
-    int maxY = 210;
-    int visibleItems = (maxY - listY) / itemH;
-
-    if (_scrollOffset + visibleItems < _settings.size()) {
-      _scrollOffset++;
-      drawList(_scrollOffset, true); // Force redraw.
     }
-    return;
-  }
 
-  // Scroll Up Button (Bottom-Right, y > 210, x 260-290)
-  if (p.x > 260 && p.x <= 290 && p.y > 210) {
-    if (millis() - lastSettingTouch < 200)
+    // B. Scroll Buttons (Bottom-Right)
+    if (p.x > SCREEN_WIDTH - 120) {
+      int listY = 40;
+      int itemH = 24;
+      int maxY = 260;
+      int visibleItems = (maxY - listY) / itemH;
+
+      if (p.x < SCREEN_WIDTH - 60) { // Up
+        if (_scrollOffset > 0) {
+          _scrollOffset--;
+          drawList(_scrollOffset, true);
+        }
+      } else { // Down
+        if (_scrollOffset + visibleItems < _settings.size()) {
+          _scrollOffset++;
+          drawList(_scrollOffset, true);
+        }
+      }
       return;
-    lastSettingTouch = millis();
-
-    if (_scrollOffset > 0) {
-      _scrollOffset--;
-      drawList(_scrollOffset, true);
     }
-    return;
   }
 
-  // Daftar Sentuh (now starts at y=30, with gap after status bar)
-  int listY = 30;
-  int itemH = 20; // Match drawList
+  // 2. List Zone (40 to 260)
+  int listY = 40;
+  int itemH = 24;
+  int maxY = 260;
 
-  // Debounce Check
-  if (millis() - lastSettingTouch > 200) {
-    // Only handle standard List Touch for list-based modes
-    if (_currentMode == MODE_MAIN || _currentMode == MODE_RPM ||
-        _currentMode == MODE_CLOCK || _currentMode == MODE_ENGINE ||
-        _currentMode == MODE_GNSS_CONFIG || _currentMode == MODE_WIFI_MENU ||
-        _currentMode == MODE_UTILITY) {
+  if (_currentMode == MODE_MAIN || _currentMode == MODE_RPM ||
+      _currentMode == MODE_CLOCK || _currentMode == MODE_ENGINE ||
+      _currentMode == MODE_GNSS_CONFIG || _currentMode == MODE_WIFI_MENU ||
+      _currentMode == MODE_UTILITY) {
+    if (p.y >= listY && p.y < maxY) {
+      if (millis() - lastSettingTouch < 200)
+        return;
+      lastSettingTouch = millis();
+
       int idx = _scrollOffset + ((p.y - listY) / itemH);
-
       if (idx >= 0 && idx < _settings.size()) {
-        unsigned long now = millis();
-        if (_lastTapIdx == idx && (now - _lastTapTime < 500)) {
-          // Double Tap Confirmed -> Execute
-          handleTouch(idx);
-
-          // Reset logic depend on action... usually reset tap tracking
-          _lastTapIdx = -1;
+        // Simple Single-Tap to select and double-tap effect or single-tap
+        // action
+        if (_selectedIdx == idx) {
+          handleTouch(idx); // Already selected -> Execute
         } else {
-          // First Tap -> Select/Prime
-          _lastTapIdx = idx;
-          _lastTapTime = now;
-
-          if (_selectedIdx != idx) {
-            _selectedIdx = idx;
-            drawList(_scrollOffset, false);
-          }
+          _selectedIdx = idx; // Select first
+          drawList(_scrollOffset, false);
         }
       }
     }
-
-    lastSettingTouch = millis();
-  } // End List Touch
+  }
 
   // WiFi List Mode
-  if (_currentMode == MODE_WIFI && p.y > 60) {
+  if (_currentMode == MODE_WIFI && p.y > 60 && p.y < 260) {
     if (millis() - _lastWiFiTouch > 300) {
       _lastWiFiTouch = millis();
-      int idx = (p.y - 60) / 25;
+      int idx = (p.y - 60) / 24;
       if (idx >= 0 && idx < _scanCount) {
         _selectedWiFiIdx = idx;
         _targetSSID = WiFi.SSID(idx);
@@ -1062,19 +1012,20 @@ void SettingsScreen::drawAbout() {
   tft->drawString("Race Computer", SCREEN_WIDTH / 2, cardY + 50);
 
   tft->setTextColor(TFT_SILVER, 0x18E3);
-  tft->setTextFont(1);
-  tft->drawString("Version 1.0 (Beta)", SCREEN_WIDTH / 2, cardY + 80);
+  tft->setTextFont(2); // Increased font
+  tft->drawString("Version 1.0 (Beta)", SCREEN_WIDTH / 2, cardY + 85);
 
   String mac = WiFi.macAddress();
-  tft->drawString("Device ID: " + mac, SCREEN_WIDTH / 2, cardY + 95);
+  tft->drawString("Device ID: " + mac, SCREEN_WIDTH / 2, cardY + 110);
 
   tft->setTextColor(TFT_ORANGE, 0x18E3);
-  tft->drawString("Made by Muchdas", SCREEN_WIDTH / 2, cardY + 120);
+  tft->setTextFont(2);
+  tft->drawString("Made by Muchdas", SCREEN_WIDTH / 2, cardY + 140);
 
-  // Footer Hint
+  // Footer Hint (Bottom-Left)
   tft->setTextColor(TFT_DARKGREY, _ui->getBackgroundColor());
-  tft->setTextDatum(BC_DATUM);
-  tft->drawString("Tap to Return", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 10);
+  tft->setTextDatum(BL_DATUM);
+  tft->drawString("< Back", 10, SCREEN_HEIGHT - 10);
 }
 
 void SettingsScreen::drawHeader(String title, uint16_t backColor) {
@@ -1367,10 +1318,10 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
     tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
   }
 
-  // List (starts at y=30, with gap after status bar)
-  int listY = 30;
-  int itemH = 20;
-  int maxY = 210; // Bottom limit for list
+  // List (starts at y=40, after header)
+  int listY = 40;
+  int itemH = 24; // Shrunk for density
+  int maxY = 260; // Clean break before footer
 
   // Clear list area to prevent ghosts when scrolling
   if (force) {
@@ -1405,8 +1356,8 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
       }
 
       // Name
-      tft->setTextDatum(TL_DATUM);
-      tft->setTextFont(1);
+      tft->setTextDatum(ML_DATUM); // Middle Left for centering
+      tft->setTextFont(2);         // Standard Font
       tft->setTextSize(1);
       tft->setTextColor(txtColor, bgColor);
 
@@ -1414,10 +1365,10 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
       if (_currentMode == MODE_GNSS_CONFIG) {
         displayName = String(idx + 1) + ". " + item.name;
       }
-      tft->drawString(displayName, 10, y + 5);
+      tft->drawString(displayName, 15, y + itemH / 2);
 
       // Value / Toggle / Action
-      tft->setTextDatum(TR_DATUM);
+      tft->setTextDatum(MR_DATUM); // Middle Right
       String valText = "";
       if (item.type == TYPE_VALUE) {
         if (item.currentOptionIdx >= 0 &&
@@ -1429,7 +1380,7 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
       } else if (item.type == TYPE_ACTION) {
         valText = ">";
       }
-      tft->drawString(valText, SCREEN_WIDTH - 10, y + 5);
+      tft->drawString(valText, SCREEN_WIDTH - 15, y + itemH / 2);
 
       // Custom Render for Toggle
       if (item.type == TYPE_TOGGLE) {
@@ -1453,21 +1404,25 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
 
   // Draw bottom elements AFTER list
   if (force) {
-    // Clear bottom area
-    tft->fillRect(0, 210, SCREEN_WIDTH, 30, COLOR_BG);
+    // Clear area between list and bottom (260 to 320)
+    tft->fillRect(0, maxY, SCREEN_WIDTH, SCREEN_HEIGHT - maxY,
+                  _ui->getBackgroundColor());
 
-    // Back Button (Left)
-    tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
+    // Back Arrow (Standardized Bottom-Left)
+    tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
 
-    // Scroll Buttons (Right)
-    // Up Arrow (Left of the pair)
+    // Scroll Buttons (Right Edge)
+    int scrollX = SCREEN_WIDTH - 100;
+    // Up Arrow
     if (scrollOffset > 0) {
-      tft->fillTriangle(270, 233, 290, 233, 280, 217, COLOR_ACCENT);
+      tft->fillTriangle(scrollX, 305, scrollX + 30, 305, scrollX + 15, 275,
+                        COLOR_ACCENT);
     }
 
-    // Down Arrow (Far Right)
+    // Down Arrow
     if (scrollOffset + visibleItems < _settings.size()) {
-      tft->fillTriangle(300, 217, 320, 217, 310, 233, COLOR_ACCENT);
+      tft->fillTriangle(scrollX + 50, 275, scrollX + 80, 275, scrollX + 65, 305,
+                        COLOR_ACCENT);
     }
   }
 }
@@ -1481,9 +1436,10 @@ void SettingsScreen::drawWiFiList(bool force) {
 
   // List networks
   int listY = 60;
-  int itemH = 25;
+  int itemH = 24; // Standardized height
 
-  for (int i = 0; i < _scanCount && i < 8; i++) {
+  for (int i = 0; i < _scanCount && i < 8;
+       i++) { // More items with smaller font
     String ssid = WiFi.SSID(i);
     int rssi = WiFi.RSSI(i);
     bool isSecure = (WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
@@ -1498,17 +1454,18 @@ void SettingsScreen::drawWiFiList(bool force) {
 
     // SSID
     tft->setTextColor(txtColor, bgColor);
-    tft->setTextDatum(TL_DATUM);
-    tft->drawString(ssid, 10, y + 5);
+    tft->setTextFont(2);
+    tft->setTextDatum(ML_DATUM);
+    tft->drawString(ssid, 15, y + itemH / 2);
 
     // Signal strength
     String signal = String(rssi) + "dBm";
-    tft->setTextDatum(TR_DATUM);
-    tft->drawString(signal, SCREEN_WIDTH - 30, y + 5);
+    tft->setTextDatum(MR_DATUM);
+    tft->drawString(signal, SCREEN_WIDTH - 40, y + itemH / 2);
 
     // Lock icon if secured
     if (isSecure) {
-      tft->drawString("*", SCREEN_WIDTH - 10, y + 5);
+      tft->drawString("*", SCREEN_WIDTH - 15, y + itemH / 2);
     }
   }
 
@@ -1604,9 +1561,9 @@ void SettingsScreen::startGraphicTest() {
   // After benchmark, we just show the results (already printed by runBenchmark)
 
   tft->setTextColor(TFT_GREEN, TFT_BLACK);
-  tft->setTextDatum(BC_DATUM);
+  tft->setTextDatum(BL_DATUM);
   tft->setTextFont(2);
-  tft->drawString("Touch to Exit", SCREEN_WIDTH / 2, SCREEN_HEIGHT - 5);
+  tft->drawString("< Exit", 10, SCREEN_HEIGHT - 10);
 }
 
 void SettingsScreen::updateGraphicTest() {

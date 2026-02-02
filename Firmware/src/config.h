@@ -52,9 +52,9 @@
 // GPS at GPIO 21/22 (Serial2) per user request
 // UART0 (GPIO 1/3) reserved for PC Debugging
 #define PIN_GPS_RX 22
-#define PIN_GPS_TX -1 // Disabled to prevent conflict with TOUCH_INT (Pin 21)
-// #define PIN_GPS_TX 21 // CONFLICT: Hardware connects this to Touch Int
-#define GPS_BAUD 9600
+#define PIN_GPS_TX 21 // Restored Pin 21 for TX since TOUCH_INT is -1 (Polling)
+#define GPS_BAUD 115200
+#define PREDICTIVE_DELTA_LIMIT 5.0 // Max delta seconds for bar display
 // #define PIN_LIGHT_SENSOR 34
 #define PIN_BATTERY 34 // Enabled per user request
 #define BATTERY_VOLTAGE_MAX 4.2

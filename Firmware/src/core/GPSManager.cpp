@@ -11,28 +11,25 @@ void GPSManager::begin() {
   _rxPin = PIN_GPS_RX;
   _txPin = PIN_GPS_TX;
 
-  // SAFEGUARD: Ensure Pin 21 is NEVER used for TX
-  if (_txPin == 21) {
-    Serial.println(
-        "WARNING: GPS TX set to 21! Forcing to -1 to prevent crash.");
-    _txPin = -1;
-  }
-
   _baudRate = GPS_BAUD;
-
-  // GPS uses UART2 (Serial2) on GPIO 21/22
-  // UART0 (Serial) is reserved for PC Debugging on GPIO 1/3
   _gpsSerial = &Serial2;
 
   Serial.printf("GPS Manager Begin: RX=%d, TX=%d\n", _rxPin, _txPin);
 
-  // Auto-detect baud rate
+  // Try to find the current GPS baud rate (might be factory 9600)
   if (!detectBaudRate()) {
-    // Fallback if detection fails
-    _baudRate = GPS_BAUD;
-    // Explicitly use _txPin (which is safely -1)
-    _gpsSerial->begin(_baudRate, SERIAL_8N1, _rxPin, _txPin);
-    Serial.println("GPS: Auto-baud failed. Using default.");
+    _baudRate = 9600; // Last ditch guess
+    _gpsSerial->begin(9600, SERIAL_8N1, _rxPin, _txPin);
+  }
+
+  // If we found it but it's not 115200, try to switch it
+  if (_baudRate != 115200) {
+    Serial.println("GPS: Switching module to 115200 baud...");
+    setBaud(115200);
+    delay(200);
+    _gpsSerial->end();
+    _gpsSerial->begin(115200, SERIAL_8N1, _rxPin, _txPin);
+    _baudRate = 115200;
   }
 
   delay(500); // Wait for GPS module to stabilize
@@ -59,6 +56,14 @@ void GPSManager::begin() {
   enableNavPvt[10] = ck_b;
 
   _gpsSerial->write(enableNavPvt, 11);
+  delay(100);
+
+  // Set to 10Hz for high performance (Accuracy enhancement)
+  setFrequencyLimit(10);
+  delay(100);
+
+  // Set Dynamic Model to Automotive (Better accuracy in corners)
+  setDynamicModel(4);
   delay(100);
 
   // Enable UBX-NAV-SAT (0x01 0x35)

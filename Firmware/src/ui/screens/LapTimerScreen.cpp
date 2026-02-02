@@ -2,6 +2,7 @@
 #include "../../core/GPSManager.h"
 #include "../../core/SessionManager.h"
 #include "../fonts/Org_01.h"
+#include <Preferences.h>
 #include <algorithm> // Untuk min_element
 
 extern GPSManager gpsManager;
@@ -32,16 +33,17 @@ void LapTimerScreen::onShow() {
   _maxRpmSession = 0; // Reset Max RPM
 
   // Reset Flicker Tracking
-  _lastSpeed = -1.0;
+  _lastSpeed = -999.0;
   _lastSats = -1;
   _lastRpmRender = -1;
   _lastMaxRpmRender = 0;
   _lastLapCountRender = -1;
-  _lastLapCountRender = -1;
   _lastRecordedStateRender = (RecordingState)-1;
   _lastLastLapTimeRender = -1;
   _lastBestLapTimeRender = -1;
-
+  _maxSpeedSession = 0.0;
+  _maxSpeedSessionRender = -1.0;
+  _maxRpmSessionRender = 0;
   _finishLineInside = false;
   _lastFinishCross = 0;
 
@@ -119,6 +121,9 @@ void LapTimerScreen::loadTracks() {
 
           if (t.containsKey("path")) {
             newTrack.pathFile = t["path"].as<String>();
+          }
+          if (t.containsKey("best_lap")) {
+            newTrack.bestLap = t["best_lap"].as<unsigned long>();
           }
 
           _tracks.push_back(newTrack);
@@ -597,7 +602,15 @@ void LapTimerScreen::update() {
 
           _state = STATE_RACING;
 
-          // fillRect is handled by drawRacingStatic -> fillScreen
+          // LOAD REFERENCE LAP FOR PREDICTIVE TIMING
+          if (t.bestLap > 0) {
+            // Try to find the best lap file in history or current
+            // For now, let's assume we load the most recent session of this
+            // track or the one that provided the best lap. Logic simplified:
+            // Use the track's pathFile if it's a log format
+            sessionManager.loadBestLapAsReference(t.pathFile);
+          }
+
           drawRacingStatic();
           drawRacing();
         } else if (idx == 1) { // Select & Edit
@@ -645,8 +658,8 @@ void LapTimerScreen::update() {
         return;
       _lastTouchTime = millis();
 
-      // 1. Back Button (Top Left)
-      if (p.x < 60 && p.y < 60) {
+      // 1. Back Button (Bottom-Left)
+      if (p.x < 100 && p.y > 240) {
         if (millis() - _lastBackTapTime < 500) {
           _state = STATE_TRACK_LIST;
           _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
@@ -661,44 +674,32 @@ void LapTimerScreen::update() {
       }
 
       // 2. Select Button
-      // x = (W - 180)/2, y=255, w=180, h=45
       int btnW = 180;
       int btnX = (SCREEN_WIDTH - btnW) / 2;
-      int btnY = 255;
+      int btnY = 240; // Match drawTrackDetails
       int btnH = 45;
 
       if (p.x > btnX && p.x < btnX + btnW && p.y > btnY - 10 &&
           p.y < btnY + btnH + 10) {
-        // SELECT ACTION
         Track &t = _tracks[_selectedTrackIdx];
         _currentTrackName = t.name;
-        _selectedConfigIdx = 0;
-
-        // Load Track Path logic
-        if (t.pathFile.length() > 0) {
-          loadTrackPath(t.pathFile);
-        } else {
-          _recordedPoints.clear();
-        }
-
         _state = STATE_RACING;
-        // fillRect handled by drawRacingStatic
-
+        if (t.pathFile.length() > 0)
+          loadTrackPath(t.pathFile);
+        if (t.bestLap > 0)
+          sessionManager.loadBestLapAsReference(t.pathFile);
         drawRacingStatic();
         drawRacing();
       }
 
       // 3. Edit Name Button
-      // infoX = 250, infoW = 220 -> x = 420
-      // infoY = 80
       int renameX = 420;
       int renameY = 80 + 5;
       if (p.x > renameX && p.x < renameX + 45 && p.y > renameY &&
           p.y < renameY + 18) {
         _state = STATE_RENAME_TRACK;
         _renamingName = _tracks[_selectedTrackIdx].name;
-        _keyboardShift = true;
-        drawRenameTrack(true); // Force Redraw to clear screen
+        drawRenameTrack(true);
       }
     }
   } else if (_state == STATE_SAVE_TRACK) {
@@ -706,8 +707,6 @@ void LapTimerScreen::update() {
       if (millis() - _lastTouchTime < 150)
         return;
       _lastTouchTime = millis();
-
-      // 1. Handle Keyboard (Starts Y=90)
       KeyboardComponent::KeyResult key = _keyboard.handleTouch(p.x, p.y, 90);
       if (key.type != KeyboardComponent::KEY_NONE) {
         if (key.type == KeyboardComponent::KEY_CHAR) {
@@ -720,60 +719,27 @@ void LapTimerScreen::update() {
             _renamingName.remove(_renamingName.length() - 1);
             drawSaveTrackName(false);
           }
-        } else if (key.type == KeyboardComponent::KEY_SPACE) {
-          if (_renamingName.length() < 15) {
-            _renamingName += ' ';
-            drawSaveTrackName(false);
-          }
+        } else if (key.type == KeyboardComponent::KEY_OK) {
+          String fn = _renamingName;
+          fn.trim();
+          if (fn.length() == 0)
+            fn = "Track_" + String(millis());
+          saveTrackToGPX("/tracks/" + fn + ".gpx");
+          _ui->showToast("Saved!", 2000);
+          _state = STATE_TRACK_LIST;
+          loadTracks();
+          drawTrackList();
         } else if (key.type == KeyboardComponent::KEY_SHIFT) {
           _keyboardShift = !_keyboardShift;
           drawSaveTrackName(true);
-        } else if (key.type == KeyboardComponent::KEY_OK) {
-          // OK = SAVE
-          String finalName = _renamingName;
-          finalName.trim();
-          if (finalName.length() == 0)
-            finalName = "Track_" + String(millis());
-          String filename = "/tracks/" + finalName + ".gpx";
-          saveTrackToGPX(filename);
-          _ui->showToast("Saved!", 2000);
-          _state = STATE_TRACK_LIST;
-          loadTracks(); // Refresh list
-          drawTrackList();
-          return;
         }
       }
-
-      // 2. Buttons logic
-      int btnY = 275; // MATCH drawSaveTrackName
-      int btnW = 100;
-      int gap = 20;
-      int startX = (SCREEN_WIDTH - (btnW * 2 + gap)) / 2;
-
-      // Cancel (Left)
-      if (p.x > startX && p.x < startX + btnW && p.y > btnY &&
-          p.y < btnY + 40) {
+      // Cancel Button (Bottom Left)
+      if (p.x < 100 && p.y > 240) {
         _state = STATE_RECORD_TRACK;
         _recordingState = RECORD_COMPLETE;
-        _lastRecordedStateRender = (RecordingState)-1; // Force full redraw
-        _ui->getTft()->fillScreen(_ui->getBackgroundColor()); // Clear
+        _ui->getTft()->fillScreen(_ui->getBackgroundColor());
         drawRecordTrack();
-        return;
-      }
-
-      // Save (Right)
-      int saveX = startX + btnW + gap;
-      if (p.x > saveX && p.x < saveX + btnW && p.y > btnY && p.y < btnY + 40) {
-        String finalName = _renamingName;
-        finalName.trim();
-        if (finalName.length() == 0)
-          finalName = "Track_" + String(millis());
-        String filename = "/tracks/" + finalName + ".gpx";
-        saveTrackToGPX(filename);
-        _ui->showToast("Saved!", 2000);
-        _state = STATE_TRACK_LIST;
-        loadTracks();
-        drawTrackList();
       }
     }
   } else if (_state == STATE_RENAME_TRACK) {
@@ -781,61 +747,45 @@ void LapTimerScreen::update() {
       if (millis() - _lastTouchTime < 250)
         return;
       _lastTouchTime = millis();
-
       KeyboardComponent::KeyResult res = _keyboard.handleTouch(p.x, p.y, 110);
-      if (res.type == KeyboardComponent::KEY_CHAR) {
-        char c = res.value;
-        if (!_keyboardShift && c >= 'A' && c <= 'Z')
-          c += 32;
-        _renamingName += c;
-        drawRenameTrack();
-      } else if (res.type == KeyboardComponent::KEY_DEL) {
-        if (_renamingName.length() > 0) {
-          _renamingName.remove(_renamingName.length() - 1);
-          drawRenameTrack();
-        }
-      } else if (res.type == KeyboardComponent::KEY_SHIFT) {
-        _keyboardShift = !_keyboardShift;
-        drawRenameTrack();
-      } else if (res.type == KeyboardComponent::KEY_SPACE) {
-        _renamingName += " ";
-        drawRenameTrack();
-      } else if (res.type == KeyboardComponent::KEY_OK) {
+      if (res.type == KeyboardComponent::KEY_OK) {
         renameTrack(_selectedTrackIdx, _renamingName);
         _state = STATE_TRACK_DETAILS;
         _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
                                 _ui->getBackgroundColor());
         drawTrackDetails();
+      } else if (res.type != KeyboardComponent::KEY_NONE) {
+        // Handle other keys...
+        if (res.type == KeyboardComponent::KEY_CHAR) {
+          _renamingName += res.value;
+          drawRenameTrack();
+        } else if (res.type == KeyboardComponent::KEY_DEL) {
+          if (_renamingName.length() > 0)
+            _renamingName.remove(_renamingName.length() - 1);
+          drawRenameTrack();
+        }
       }
     }
   } else if (_state == STATE_SUMMARY) {
 
     // --- LOGIKA STATUS RINGKASAN ---
     if (touched) {
-      // 1. KEMBALI/MENU (Kiri Atas)
-      if (p.x < 60 && p.y < 60) {
-        if (millis() - _lastTouchTime < 200)
-          return;
-        _lastTouchTime = millis();
+      if (millis() - _lastTouchTime < 200)
+        return;
+      _lastTouchTime = millis();
 
-        if (_menuSelectionIdx == -2) {
-          if (millis() - _lastBackTapTime < 500) {
-            // Back to Sub-Menu
-            _state = STATE_MENU;
-            _menuSelectionIdx = -1;
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    _ui->getBackgroundColor());
-            drawMenu();
-            _ui->drawStatusBar();
-            _lastBackTapTime = 0;
-          } else {
-            _lastBackTapTime = millis();
-          }
+      // 1. Tombol Kembali (Bottom Left area)
+      if (p.x < 100 && p.y > 240) {
+        if (millis() - _lastBackTapTime < 500) {
+          _state = STATE_TRACK_LIST;
+          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                  _ui->getBackgroundColor());
+          drawTrackList();
+          _ui->drawStatusBar();
+          _lastBackTapTime = 0;
         } else {
-          _menuSelectionIdx = -2;
-          drawSummary();
           _lastBackTapTime = millis();
         }
         return;
@@ -857,8 +807,8 @@ void LapTimerScreen::update() {
     extern GPSManager gpsManager;
 
     if (touched) {
-      // Back button (Top Left)
-      if (p.x < 60 && p.y < 60) {
+      // Back button (Bottom Left area)
+      if (p.x < 100 && p.y > 240) {
         if (millis() - _lastBackTapTime < 500) {
           _state = STATE_MENU;
           _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
@@ -1009,7 +959,8 @@ void LapTimerScreen::update() {
     }
   } else if (_state == STATE_NO_GPS) {
     if (touched) {
-      if (p.x > 170 && p.x < 300 && p.y > SCREEN_HEIGHT - 60) {
+      // BACK Button (Bottom-Left)
+      if (p.x < 100 && p.y > 240) {
         _state = STATE_MENU;
         _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
@@ -1024,39 +975,28 @@ void LapTimerScreen::update() {
         if (millis() - _lastTouchTime < 200)
           return;
         _lastTouchTime = millis();
-        _state = STATE_SUMMARY;
-        if (sessionManager.isLogging()) {
-          String dateStr =
-              gpsManager.getDateString() + " " + gpsManager.getTimeString();
-          sessionManager.appendToHistoryIndex("Track Session", dateStr,
-                                              _lapCount, _bestLapTime, "TRACK");
-        }
-        sessionManager.stopSession();
-        _isRecording = false;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-        drawSummary();
+        finalizeRaceSession();
         return;
       }
       if (p.x > 150 && p.x < 330 && p.y > STOP_BTN_Y) {
-        _state = STATE_SUMMARY;
-        if (sessionManager.isLogging()) {
-          String dateStr =
-              gpsManager.getDateString() + " " + gpsManager.getTimeString();
-          sessionManager.appendToHistoryIndex("Track Session", dateStr,
-                                              _lapCount, _bestLapTime, "TRACK");
-        }
-        sessionManager.stopSession();
-        _isRecording = false;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-        drawSummary();
+        if (millis() - _lastTouchTime < 200)
+          return;
+        _lastTouchTime = millis();
+        finalizeRaceSession();
         return;
       }
     }
 
     if (_finishSet)
       checkFinishLine();
+
+    // Update Max Stats
+    float curSpeed = gpsManager.getSpeedKmph();
+    if (curSpeed > _maxSpeedSession)
+      _maxSpeedSession = curSpeed;
+    int curRpm = gpsManager.getRPM();
+    if (curRpm > _maxRpmSession)
+      _maxRpmSession = (unsigned long)curRpm;
 
     if (sessionManager.isLogging() && (millis() - _lastUpdate > 100)) {
       String data = String(millis()) + "," +
@@ -1097,6 +1037,17 @@ void LapTimerScreen::update() {
             gpsManager.distanceBetween(lastLatRef, lastLonRef, curLat, curLon);
         if (d > 0.5)
           _currentLapDist += d;
+
+        // --- Delta Calculation ---
+        if (!sessionManager.referenceLap.empty()) {
+          float refTime = sessionManager.getReferenceTime(_currentLapDist);
+          if (refTime > 0) {
+            unsigned long lapTime = millis() - _currentLapStart;
+            _currentDelta = (float)(lapTime - refTime) / 1000.0f;
+          }
+        } else {
+          _currentDelta = 0.0f;
+        }
       }
       lastLatRef = curLat;
       lastLonRef = curLon;
@@ -1423,6 +1374,9 @@ void LapTimerScreen::drawTrackDetails() {
   int selX = (SCREEN_WIDTH - btnW) / 2;
   tft->fillRoundRect(selX, btnY, btnW, btnH, 6, 0x05E0); // Greenish
   tft->drawRoundRect(selX, btnY, btnW, btnH, 6, TFT_WHITE);
+
+  // BACK Button  // Back Triangle (Standardized Bottom-Left)
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, TFT_BLUE);
 
   tft->setTextColor(TFT_WHITE, 0x05E0);
   tft->setTextDatum(MC_DATUM);
@@ -1819,9 +1773,8 @@ void LapTimerScreen::drawSummary() {
   tft->setTextSize(2);
   tft->drawString("SESSION SUMMARY", SCREEN_WIDTH / 2, 28);
 
-  // Back Button (<)
-  tft->setTextDatum(TL_DATUM);
-  tft->drawString("<", 10, 25);
+  // Back Arrow (Standardized Bottom-Left)
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
 
   // --- DATA PROCESSING ---
   int bestIdx = -1;
@@ -1964,276 +1917,282 @@ void LapTimerScreen::drawSummary() {
 
 void LapTimerScreen::drawRacingStatic() {
   TFT_eSPI *tft = _ui->getTft();
-
-  // Use fillScreen to ensure complete clearing of previous screen or ghosting
-  // This is safer than fillRect for full-screen modes
   tft->fillScreen(TFT_BLACK);
 
-  // --- LAYOUT DEFINITIONS ---
-  int topBarH = 25;
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextPadding(0);
 
-  // COMPACT LAYOUT
-  int rpmY = STATUS_BAR_HEIGHT + 5;
-  int rpmH = 20;
-  int midY = rpmY + rpmH + 8;
-  int midH = 85;
-  int gridY = midY + midH + 8;
+  // --- FORCE DYNAMIC REDRAW ---
+  // Reset trackers so drawRacing() repopulates everything
+  _lastSpeed = -999.0;
+  _lastSats = -1;
+  _lastRpmRender = -1;
+  _lastMaxRpmRender = 0;
+  _lastLapCountRender = -1;
+  _lastRecordedStateRender = (RecordingState)-1;
+  _lastLastLapTimeRender = -1;
+  _lastBestLapTimeRender = -1;
+  _maxSpeedSessionRender = -1.0;
+  _maxRpmSessionRender = 0;
 
-  int centerSplitX = SCREEN_WIDTH / 3 + 20;
+  // --- LAYOUT DEFINITIONS (480x320) ---
+  int rpmY = STATUS_BAR_HEIGHT + 2;
+  int rpmH = 22;
 
-  // 1. RPM BAR CONTAINER
-  tft->drawRoundRect(5, rpmY, SCREEN_WIDTH - 10, rpmH, 4, TFT_DARKGREY);
+  // MAIN DASHBOARD SPLIT (Upper half: 24-210)
+  int midY = rpmY + rpmH + 6;
+  int dashH = 180;
 
-  // --- 2. MAIN LAYOUT SPLIT ---
+  // THREE COLUMN SYSTEM
+  int colW = SCREEN_WIDTH / 3; // 160px each
 
-  // MAP CARD (Left)
-  int mapX = 5;
-  int mapW = centerSplitX - 10;
-  tft->fillRoundRect(mapX, midY, mapW, midH, 8, 0x18E3); // Charcoal
+  // 1. RPM BAR (PRO LOOK)
+  tft->drawRoundRect(5, rpmY, SCREEN_WIDTH - 10, rpmH, 5, TFT_DARKGREY);
+  // RPM Labels (0-10k) - Tiny dots
+  for (int i = 1; i < 10; i++) {
+    int dx = 5 + (i * (SCREEN_WIDTH - 10) / 10);
+    tft->drawFastVLine(dx, rpmY + rpmH - 4, 3, TFT_SILVER);
+  }
 
-  drawTrackMap(mapX, midY, mapW, midH);
+  // 2. LEFT COLUMN: TRACK INFO & STATS
+  int leftX = 5;
+  int leftW = colW - 10;
+  tft->fillRoundRect(leftX, midY, leftW, dashH, 8, 0x18E3); // Charcoal
 
-  // MAIN TIMER AREA
-  int timeAreaW = SCREEN_WIDTH - centerSplitX - 5;
-  int timeCenterX = centerSplitX + timeAreaW / 2;
-  int timeY = midY + 52;
-
-  // Current Lap Label Box
-  int lblW = 150;
-  int lblH = 22;
-  int lblY = midY + 4;
-
-  // Draw Box
-  tft->fillRoundRect(timeCenterX - lblW / 2, lblY, lblW, lblH, 4, 0x18E3);
   tft->setTextColor(TFT_SILVER, 0x18E3);
   tft->setTextFont(1);
-  tft->setTextDatum(ML_DATUM);
-  tft->drawString("CURRENT LAP", timeCenterX - lblW / 2 + 10,
-                  lblY + lblH / 2 + 1);
+  tft->setTextDatum(TC_DATUM);
+  tft->drawString("TRACK INFO", leftX + leftW / 2, midY + 5);
+  tft->drawFastHLine(leftX + 10, midY + 16, leftW - 20, TFT_DARKGREY);
 
-  // --- 3. BOTTOM STATS GRID ---
-  int gridH = SCREEN_HEIGHT - gridY - 5;
-  int cardW = (SCREEN_WIDTH - 15) / 2;
-  int cardH = (gridH - 5) / 2;
+  // Labels for left column
+  tft->setTextDatum(TL_DATUM);
+  tft->drawString("MAX SPD", leftX + 10, midY + 25);
+  tft->drawString("G-FORCE", leftX + 10, midY + 75);
+  tft->drawString("SATS", leftX + 10, midY + 125);
 
-  uint16_t cardBg = 0x18E3;
+  // 3. CENTER COLUMN: SPEED & DELTA
+  int centerX = colW + 5;
+  int centerW = colW - 10;
+  // Speed Zone (Huge)
+  tft->setTextColor(TFT_SILVER, TFT_BLACK);
+  tft->setTextFont(2);
+  tft->setTextDatum(BC_DATUM);
+  tft->drawString("KM/H", SCREEN_WIDTH / 2, midY + dashH - 10);
 
-  // Helper to draw formatted card
-  auto drawCard = [&](int x, int y, String label) {
-    tft->fillRoundRect(x, y, cardW, cardH, 8, cardBg);
-    tft->setTextColor(TFT_SILVER, cardBg);
-    tft->setTextFont(1);
-    tft->setTextDatum(TL_DATUM);
-    tft->drawString(label, x + 10, y + 6);
-  };
+  // 4. RIGHT COLUMN: LAP TIMES
+  int rightX = (colW * 2) + 5;
+  int rightW = colW - 10;
+  tft->fillRoundRect(rightX, midY, rightW, dashH, 8, 0x18E3); // Charcoal
 
-  // Row 1 Left: LAST LAP
-  drawCard(5, gridY, "LAST LAP");
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->setTextDatum(TC_DATUM);
+  tft->drawString("LAP TIMES", rightX + rightW / 2, midY + 5);
+  tft->drawFastHLine(rightX + 10, midY + 16, rightW - 20, TFT_DARKGREY);
 
-  // Row 1 Right: BEST LAP
-  drawCard(10 + cardW, gridY, "BEST LAP");
+  // Labels for right column
+  tft->setTextDatum(TL_DATUM);
+  tft->drawString("LAST", rightX + 10, midY + 28);  // Lowered
+  tft->drawString("BEST", rightX + 10, midY + 108); // Lowered
 
-  // Row 2 Left: SPEED
-  int row2Y = gridY + cardH + 5;
-  drawCard(5, row2Y, "SPEED");
+  // --- 5. BOTTOM AREA: CONTROL & PREDICTIVE ---
+  int footerY = midY + dashH + 5;
+  // Background Box (Only draw border, text is dynamic)
+  tft->drawRoundRect(5, footerY, SCREEN_WIDTH - 10, 80, 8, TFT_DARKGREY);
 
-  // Row 2 Right: SATS
-  drawCard(10 + cardW, row2Y, "SATS");
-
-  // Redraw StatusBar on top of black fill
   _ui->drawStatusBar(true);
 }
 
 void LapTimerScreen::drawRPMBar(int rpm, int maxRpm) {
   TFT_eSPI *tft = _ui->getTft();
-  int x = 7;
+  int xStart = 7;
   int y = STATUS_BAR_HEIGHT + 7;
   int w = SCREEN_WIDTH - 14;
   int h = 16;
 
   if (maxRpm < 5000)
-    maxRpm = 8000;
+    maxRpm = 10000;
 
-  int fillW = map(constrain(rpm, 0, maxRpm), 0, maxRpm, 0, w);
+  int segments = 20;
+  int segW = (w / segments) - 2;
+  int activeSegs = map(constrain(rpm, 0, maxRpm), 0, maxRpm, 0, segments);
 
-  // Gradient Color Logic
-  uint16_t color = TFT_GREEN;
-  if (rpm > maxRpm * 0.9)
-    color = TFT_RED;
-  else if (rpm > maxRpm * 0.7)
-    color = TFT_YELLOW;
+  for (int i = 0; i < segments; i++) {
+    int sx = xStart + (i * (segW + 2));
+    uint16_t color = 0x10A2; // Dark background for inactive
 
-  // Draw Fill
-  tft->fillRect(x, y, fillW, h, color);
-  // Clear rest
-  tft->fillRect(x + fillW, y, w - fillW, h, 0x10A2);
+    if (i < activeSegs) {
+      if (i < segments * 0.6)
+        color = TFT_GREEN;
+      else if (i < segments * 0.8)
+        color = TFT_ORANGE;
+      else
+        color = TFT_RED;
+    }
+
+    tft->fillRect(sx, y, segW, h, color);
+  }
 }
 
 void LapTimerScreen::drawRacing() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // --- RE-DEFINE LAYOUT CONSTANTS ---
-  int rpmY = STATUS_BAR_HEIGHT + 5;
-  int rpmH = 20;
-  int midY = rpmY + rpmH + 8;
-  int midH = 85;
+  // --- FONT SAFETY (Prevent leaks from Font 6/7) ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextPadding(0);
 
-  int centerSplitX = SCREEN_WIDTH / 3 + 20;
+  // --- RE-DEFINE LAYOUT CONSTANTS (Match drawRacingStatic) ---
+  int rpmY = STATUS_BAR_HEIGHT + 2;
+  int rpmH = 22;
+  int midY = rpmY + rpmH + 6;
+  int dashH = 180;
+  int colW = SCREEN_WIDTH / 3;
+  int footerY = midY + dashH + 5;
 
-  int gridY = midY + midH + 8;
-  int gridH = SCREEN_HEIGHT - gridY - 5;
-  int cardW = (SCREEN_WIDTH - 15) / 2;
-  int cardH = (gridH - 5) / 2;
-  int row2Y = gridY + cardH + 5;
+  uint16_t cardBg = 0x18E3; // Charcoal
 
-  uint16_t cardBg = 0x18E3;
-
-  // --- 1. RPM BAR ---
+  // --- 1. RPM BAR (Segmented Pro Look) ---
   int currentRpm = gpsManager.getRPM();
   if (currentRpm > _maxRpmSession)
     _maxRpmSession = currentRpm;
   if (abs(currentRpm - _lastRpmRender) > 50) {
-    drawRPMBar(currentRpm, 10000);
+    drawRPMBar(currentRpm, 10000); // Now uses segmented logic
     _lastRpmRender = currentRpm;
   }
 
-  // --- 2. MAIN TIME ---
-  unsigned long currentLap = 0;
-  if (_isRecording)
-    currentLap = millis() - _currentLapStart;
+  // --- 2. MAIN SPEED (Huge Center Value) ---
+  float speed = gpsManager.getSpeedKmph();
+  // Check units (km/h vs mph)
+  Preferences prefs;
+  prefs.begin("laptimer", true);
+  bool useMph = prefs.getInt("units", 0) == 1;
+  prefs.end();
+  if (useMph)
+    speed *= 0.621371;
 
-  int ms = (currentLap % 1000);
-  int s = (currentLap / 1000) % 60;
-  int m = (currentLap / 60000);
-  char timeBuf[16];
-  sprintf(timeBuf, "%02d:%02d.%02d", m, s, ms / 10);
-
-  int timeAreaW = SCREEN_WIDTH - centerSplitX - 5;
-  int timeCenterX = centerSplitX + timeAreaW / 2;
-  int timeY = midY + 52;
-
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextFont(6);
-  tft->setTextSize(1);
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextPadding(timeAreaW);
-  tft->drawString(timeBuf, timeCenterX, timeY);
-  tft->setTextPadding(0);
-
-  // Lap Count (Inside Label Box)
-  if (_lapCount != _lastLapCountRender) {
-    // Redraw "L x" inside the "CURRENT LAP" box
-    int lblW = 150;
-    int lblH = 22;
-    int lblY = midY + 4;
-
-    // Background is charcoal (same as box)
-    tft->setTextColor(TFT_GOLD, 0x18E3);
-    tft->setTextFont(2);
+  if (abs(speed - _lastSpeed) > 0.1) { // Lower threshold
     tft->setTextSize(1);
-    tft->setTextDatum(MR_DATUM);
-    // Right Align inside box
-    tft->setTextPadding(40);
-    tft->drawString("L " + String(_lapCount + 1), timeCenterX + lblW / 2 - 10,
-                    lblY + lblH / 2 + 1);
-    tft->setTextPadding(0);
+    tft->setTextFont(7); // Massive Digital
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextDatum(MC_DATUM);
+    // Explicitly clear speed area to prevent ghosting
+    tft->fillRect(colW + 10, midY + 30, colW - 20, 110,
+                  TFT_BLACK); // Larger clear area
+    tft->drawString(String((int)speed), SCREEN_WIDTH / 2, midY + 85);
+    _lastSpeed = speed;
 
-    _lastLapCountRender = _lapCount;
+    tft->setTextFont(1); // Safety Reset
   }
 
-  // --- 3. BOTTOM DATA GRID ---
-  int valOffsetY = cardH / 2 + 5;
-
-  // ROW 1 LEFT: LAST LAP
-  long lastTimeVal = (_lastLapTime > 0) ? _lastLapTime : -1;
-  if (lastTimeVal != _lastLastLapTimeRender) {
-    String text = "--:--.--";
-    if (lastTimeVal > 0) {
-      int lms = lastTimeVal % 1000;
-      int ls = (lastTimeVal / 1000) % 60;
-      int lm = (lastTimeVal / 60000);
-      char b[16];
-      sprintf(b, "%02d:%02d.%02d", lm, ls, lms / 10);
-      text = String(b);
-    }
+  // --- 3. SESSION INFO (Left Column) ---
+  int sidePad = colW - 20;
+  // Max Speed update
+  if (abs(_maxSpeedSessionRender - _maxSpeedSession) > 0.1) {
     tft->setTextColor(TFT_WHITE, cardBg);
     tft->setTextFont(4);
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextPadding(cardW - 10);
-    tft->drawString(text, 5 + cardW / 2, gridY + valOffsetY);
-    tft->setTextPadding(0);
-    _lastLastLapTimeRender = lastTimeVal;
+    tft->setTextDatum(TL_DATUM);
+    tft->setTextPadding(sidePad);
+    tft->drawString(
+        String((int)(useMph ? _maxSpeedSession * 0.621 : _maxSpeedSession)),
+        5 + 10, midY + 42);
+    _maxSpeedSessionRender = _maxSpeedSession;
   }
-
-  // ROW 1 RIGHT: BEST LAP
-  long bestTimeVal = (_bestLapTime > 0) ? _bestLapTime : -1;
-  if (bestTimeVal != _lastBestLapTimeRender) {
-    String text = "--:--.--";
-    if (bestTimeVal > 0) {
-      int bms = bestTimeVal % 1000;
-      int bs = (bestTimeVal / 1000) % 60;
-      int bm = (bestTimeVal / 60000);
-      char b[16];
-      sprintf(b, "%02d:%02d.%02d", bm, bs, bms / 10);
-      text = String(b);
-    }
-    tft->setTextColor(TFT_GOLD, cardBg);
-    tft->setTextFont(4);
-    tft->setTextSize(1);
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextPadding(cardW - 10);
-    tft->drawString(text, 10 + 1.5 * cardW, gridY + valOffsetY);
-    tft->setTextPadding(0);
-    _lastBestLapTimeRender = bestTimeVal;
-  }
-
-  // PREDICTIVE DELTA (Overlay or Separate)
-  if (_isRecording &&
-      abs(_currentDelta) < 30000) { // Only show if valid/sensible
-    int deltaY = midY + 4;          // Same as "Current Lap" label
-    int deltaH = 22;
-    int deltaW = 80;
-    int deltaX = 10; // Left side overlay
-
-    // Calculate Color
-    uint16_t dColor = (_currentDelta <= 0) ? TFT_GREEN : TFT_RED;
-    String dText = String(abs(_currentDelta) / 1000.0, 2);
-    if (_currentDelta > 0)
-      dText = "+" + dText; // Slow
-    else
-      dText = "-" + dText; // Fast
-
-    tft->fillRoundRect(deltaX, deltaY, deltaW, deltaH, 4, dColor);
-    tft->setTextColor(TFT_BLACK, dColor);
-    tft->setTextFont(2);
-    tft->setTextDatum(MC_DATUM);
-    tft->drawString(dText, deltaX + deltaW / 2, deltaY + deltaH / 2 + 1);
-  }
-
-  // ROW 2 LEFT: SPEED
-  float speed = gpsManager.getSpeedKmph();
-  if (abs(speed - _lastSpeed) > 0.5) {
-    tft->setTextColor(TFT_CYAN, cardBg);
-    tft->setTextFont(6);
-    tft->setTextSize(1);
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextPadding(cardW - 10);
-    tft->drawFloat(speed, 1, 5 + cardW / 2, row2Y + valOffsetY);
-    tft->setTextPadding(0);
-    _lastSpeed = speed;
-  }
-
-  // ROW 2 RIGHT: SATS
+  // Sats update
   int sats = gpsManager.getSatellites();
   if (sats != _lastSats) {
     tft->setTextColor(TFT_WHITE, cardBg);
     tft->setTextFont(4);
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextPadding(cardW - 10);
-    tft->drawNumber(sats, 10 + 1.5 * cardW, row2Y + valOffsetY);
-    tft->setTextPadding(0);
+    tft->setTextDatum(TL_DATUM);
+    tft->setTextPadding(sidePad);
+    tft->drawString(String(sats), 5 + 10, midY + 142);
     _lastSats = sats;
   }
+
+  // --- 4. LAP TIMES (Right Column) ---
+  // LAST LAP
+  if (_lastLapTime != _lastLastLapTimeRender) {
+    String text = "--:--.---";
+    if (_lastLapTime > 0) {
+      int ms = _lastLapTime % 1000;
+      int s = (_lastLapTime / 1000) % 60;
+      int m = (_lastLapTime / 60000);
+      char b[16];
+      sprintf(b, "%01d:%02d.%03d", m, s, ms);
+      text = String(b);
+    }
+    tft->setTextColor(TFT_WHITE, cardBg);
+    tft->setTextFont(2);
+    tft->setTextDatum(TL_DATUM);
+    tft->setTextPadding(colW - 25);
+    tft->drawString(text, (colW * 2) + 15, midY + 54); // More space from label
+    _lastLastLapTimeRender = _lastLapTime;
+  }
+  // BEST LAP
+  if (_bestLapTime != _lastBestLapTimeRender) {
+    String text = "--:--.---";
+    if (_bestLapTime > 0) {
+      int ms = _bestLapTime % 1000;
+      int s = (_bestLapTime / 1000) % 60;
+      int m = (_bestLapTime / 60000);
+      char b[16];
+      sprintf(b, "%01d:%02d.%03d", m, s, ms);
+      text = String(b);
+    }
+    tft->setTextColor(TFT_GOLD, cardBg); // Gold for Best
+    tft->setTextFont(2);
+    tft->setTextDatum(TL_DATUM);
+    tft->setTextPadding(colW - 25);
+    tft->drawString(text, (colW * 2) + 15, midY + 134); // More space from label
+    _lastBestLapTimeRender = _bestLapTime;
+  }
+
+  // --- 5. PREDICTIVE FOOTER ---
+  // Background Box based on delta
+  uint16_t deltaColor = COLOR_SECONDARY;
+  if (_isRecording && !sessionManager.referenceLap.empty()) {
+    deltaColor = (_currentDelta <= 0) ? TFT_GREEN : TFT_RED;
+    // Draw "Glow" box
+    tft->fillRoundRect(10, footerY + 5, SCREEN_WIDTH - 20, 70, 6, deltaColor);
+
+    // Delta Text
+    tft->setTextColor(TFT_WHITE, deltaColor);
+    tft->setTextFont(6);
+    tft->setTextDatum(MC_DATUM);
+    char dBuf[16];
+    snprintf(dBuf, sizeof(dBuf), "%s%.2f", (_currentDelta >= 0 ? "+" : ""),
+             _currentDelta);
+    tft->drawString(dBuf, SCREEN_WIDTH / 2, footerY + 32);
+
+    // Mini Live Timer
+    unsigned long currentLap = millis() - _currentLapStart;
+    int ms = (currentLap % 1000);
+    int s = (currentLap / 1000) % 60;
+    int m = (currentLap / 60000);
+    char tBuf[16];
+    sprintf(tBuf, "%02d:%02d.%01d", m, s, ms / 100);
+    tft->setTextSize(1);
+    tft->setTextFont(2);
+    tft->setTextPadding(SCREEN_WIDTH - 60);
+    tft->drawString(tBuf, SCREEN_WIDTH / 2, footerY + 68);
+  } else {
+    // Idle Predictive Area - CLEAR AREA FIRST to prevent duplicates
+    tft->fillRect(10, footerY + 10, SCREEN_WIDTH - 20, 60, TFT_BLACK);
+
+    tft->setTextColor(COLOR_SECONDARY, TFT_BLACK);
+    tft->setTextFont(2);
+    tft->setTextSize(1);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString("WAITING FOR LAP 2...", SCREEN_WIDTH / 2, footerY + 40);
+  }
+
+  // --- FINAL CLEANUP (Prevent font leaks) ---
+  tft->setTextPadding(0);
+  tft->setTextSize(1);
+  tft->setTextFont(1);
+  tft->setFreeFont(NULL);
 }
 
 void LapTimerScreen::drawTrackMap(int x, int y, int w, int h) {
@@ -2387,8 +2346,16 @@ void LapTimerScreen::checkFinishLine() {
         unsigned long lapTime = millis() - _currentLapStart;
         _lastLapTime = lapTime;
         _lapTimes.push_back(lapTime); // Tambahkan ke riwayat
-        if (_bestLapTime == 0 || lapTime < _bestLapTime)
+        if (_bestLapTime == 0 || lapTime < _bestLapTime) {
           _bestLapTime = lapTime;
+          // Reload reference lap from CURRENT session file
+          if (sessionManager.isLogging()) {
+            String curFile = sessionManager.getCurrentFilename();
+            Serial.print("New Best Lap! Loading reference: ");
+            Serial.println(curFile);
+            sessionManager.loadBestLapAsReference(curFile);
+          }
+        }
         _lapCount++;
 
         // Log Lap Event
@@ -2599,6 +2566,53 @@ void LapTimerScreen::saveNewTrack(String name, double sLat, double sLon,
     serializeJson(doc, wFile);
     wFile.close();
   }
+}
+
+void LapTimerScreen::finalizeRaceSession() {
+  _state = STATE_SUMMARY;
+  if (sessionManager.isLogging()) {
+    String dateStr =
+        gpsManager.getDateString() + " " + gpsManager.getTimeString();
+    sessionManager.appendToHistoryIndex("Track Session", dateStr, _lapCount,
+                                        _bestLapTime, "TRACK");
+
+    // PERSIST BEST LAP TO tracks.json
+    if (_selectedTrackIdx >= 0 && _selectedTrackIdx < (int)_tracks.size()) {
+      Track &t = _tracks[_selectedTrackIdx];
+      if (_bestLapTime > 0 && (_bestLapTime < t.bestLap || t.bestLap == 0)) {
+        t.bestLap = _bestLapTime;
+        t.pathFile = sessionManager.getCurrentFilename();
+
+        // Update JSON file
+        File file = SD.open("/tracks.json", FILE_READ);
+        if (file) {
+          JsonDocument doc;
+          deserializeJson(doc, file);
+          file.close();
+
+          JsonArray tracks = doc["tracks"];
+          for (JsonObject track : tracks) {
+            if (track["name"] == t.name) {
+              track["best_lap"] = t.bestLap;
+              track["path"] = t.pathFile;
+              break;
+            }
+          }
+
+          File wFile = SD.open("/tracks.json", FILE_WRITE);
+          if (wFile) {
+            serializeJson(doc, wFile);
+            wFile.close();
+          }
+        }
+      }
+    }
+  }
+  sessionManager.stopSession();
+  _isRecording = false;
+  _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                          SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+  drawSummary();
 }
 
 void LapTimerScreen::drawRenameTrack(bool force) {
