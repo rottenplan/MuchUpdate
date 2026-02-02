@@ -1948,6 +1948,11 @@ void LapTimerScreen::drawRacingStatic() {
 
   // 1. RPM BAR (PRO LOOK)
   tft->drawRoundRect(5, rpmY, SCREEN_WIDTH - 10, rpmH, 5, TFT_DARKGREY);
+  // RPM Labels (0-10k) - Tiny dots
+  for (int i = 1; i < 10; i++) {
+    int dx = 5 + (i * (SCREEN_WIDTH - 10) / 10);
+    tft->drawFastVLine(dx, rpmY + rpmH - 4, 3, TFT_SILVER);
+  }
 
   // 2. LEFT COLUMN: TRACK INFO
   int leftX = 5;

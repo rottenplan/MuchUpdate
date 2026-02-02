@@ -41,8 +41,8 @@ UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _lastLogging = false;
   _wasCharging = false;
   _lastWifiStatus = -1;
-  _isDarkMode = true;        // Default Dark
-  _debugTouchEnabled = true; // FORCE ENABLE DEBUG
+  _isDarkMode = true;         // Default Dark
+  _debugTouchEnabled = false; // DISABLED
   _lastTouchProcessedTime = 0;
 }
 
