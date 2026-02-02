@@ -22,11 +22,20 @@ public:
 
   bool isConnected() { return _isConnected; }
 
+  void setRollOffset(float offset) { _rollOffset = offset; }
+  float getRollOffset() { return _rollOffset; }
+  void setPitchOffset(float offset) { _pitchOffset = offset; }
+  float getPitchOffset() { return _pitchOffset; }
+
+  void calibrateLevel(); // Set current orientation as 0,0
+  void saveSettings();
+
 private:
   MPU6050 _mpu;
   bool _isConnected;
   float _angleX, _angleY, _angleZ;
   float _accX, _accY, _accZ;
+  float _rollOffset, _pitchOffset;
   unsigned long _lastUpdate;
 };
 

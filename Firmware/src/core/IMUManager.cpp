@@ -1,8 +1,10 @@
 #include "IMUManager.h"
+#include <Preferences.h>
 
 IMUManager::IMUManager() : _mpu(Wire), _isConnected(false), _lastUpdate(0) {
   _angleX = _angleY = _angleZ = 0;
   _accX = _accY = _accZ = 0;
+  _rollOffset = _pitchOffset = 0;
 }
 
 void IMUManager::begin() {
@@ -12,7 +14,14 @@ void IMUManager::begin() {
   if (status == 0) {
     _isConnected = true;
     Serial.println("MPU6050: Connected!");
-    _mpu.calcOffsets(); // Initial auto-calibration
+    _mpu.calcOffsets(); // Initial sensor calibration
+
+    // Load user offsets
+    Preferences prefs;
+    prefs.begin("laptimer", true);
+    _rollOffset = prefs.getFloat("imu_roll_off", 0.0);
+    _pitchOffset = prefs.getFloat("imu_pitch_off", 0.0);
+    prefs.end();
   } else {
     _isConnected = false;
     Serial.print("MPU6050: Connection failed with status ");
@@ -27,8 +36,9 @@ void IMUManager::update() {
   if (millis() - _lastUpdate > 10) { // 100Hz update rate
     _mpu.update();
 
-    _angleX = _mpu.getAngleX();
-    _angleY = _mpu.getAngleY();
+    // Apply manual offsets
+    _angleX = _mpu.getAngleX() - _rollOffset;
+    _angleY = _mpu.getAngleY() - _pitchOffset;
     _angleZ = _mpu.getAngleZ();
 
     _accX = _mpu.getAccX();
@@ -41,10 +51,29 @@ void IMUManager::update() {
 
 void IMUManager::calibrate() {
   if (_isConnected) {
-    Serial.println("MPU6050: Calibrating...");
+    Serial.println("MPU6050: Calibrating Sensor Bias...");
     _mpu.calcOffsets();
-    Serial.println("MPU6050: Calibrated.");
+    Serial.println("MPU6050: Sensor Calibrated.");
   }
+}
+
+void IMUManager::calibrateLevel() {
+  if (_isConnected) {
+    _mpu.update();
+    _rollOffset = _mpu.getAngleX();
+    _pitchOffset = _mpu.getAngleY();
+    saveSettings();
+    Serial.printf("MPU6050: Level Calibrated. RollOff: %.2f, PitchOff: %.2f\n",
+                  _rollOffset, _pitchOffset);
+  }
+}
+
+void IMUManager::saveSettings() {
+  Preferences prefs;
+  prefs.begin("laptimer", false);
+  prefs.putFloat("imu_roll_off", _rollOffset);
+  prefs.putFloat("imu_pitch_off", _pitchOffset);
+  prefs.end();
 }
 
 IMUManager imuManager;

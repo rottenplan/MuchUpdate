@@ -1,6 +1,7 @@
 #include "SettingsScreen.h"
 #include "../../config.h"
 #include "../../core/GPSManager.h"
+#include "../../core/IMUManager.h"
 #include "../../core/SessionManager.h"
 #include "../../core/SyncManager.h"
 #include "../../core/WiFiManager.h"
@@ -11,6 +12,7 @@
 extern SessionManager sessionManager;
 extern WiFiManager wifiManager;
 extern SyncManager syncManager;
+extern IMUManager imuManager;
 
 // Static pointer for callback
 static TFT_eSPI *static_tft = nullptr;
@@ -320,6 +322,49 @@ void SettingsScreen::loadSettings() {
     // TFT Benchmark (Standard)
     _settings.push_back({"TFT BENCHMARK", TYPE_ACTION});
 
+    // MPU6050 Setting
+    _settings.push_back({"MPU6050 SETTING", TYPE_ACTION});
+
+    _prefs.end();
+  } else if (_currentMode == MODE_IMU) {
+    _prefs.begin("laptimer", false);
+
+    // 1. Calibrate Level (Action)
+    _settings.push_back({"CALIBRATE LEVEL", TYPE_ACTION});
+
+    // 2. Manual Roll Offset
+    SettingItem rollOff = {"ROLL OFFSET", TYPE_VALUE, "imu_roll_off"};
+    // Options: -10 to +10 in 0.5 steps? Or simpler -5 to +5
+    for (float f = -5.0; f <= 5.1; f += 0.5) {
+      rollOff.options.push_back(String(f, 1) + "*");
+    }
+    float curRollOff = _prefs.getFloat("imu_roll_off", 0.0);
+    // Find closest index
+    rollOff.currentOptionIdx =
+        10; // Default 0.0 is at index 10 ( -5 + 0.5*10 = 0)
+    for (int i = 0; i < rollOff.options.size(); i++) {
+      if (abs(rollOff.options[i].toFloat() - curRollOff) < 0.1) {
+        rollOff.currentOptionIdx = i;
+        break;
+      }
+    }
+    _settings.push_back(rollOff);
+
+    // 3. Manual Pitch Offset
+    SettingItem pitchOff = {"PITCH OFFSET", TYPE_VALUE, "imu_pitch_off"};
+    for (float f = -5.0; f <= 5.1; f += 0.5) {
+      pitchOff.options.push_back(String(f, 1) + "*");
+    }
+    float curPitchOff = _prefs.getFloat("imu_pitch_off", 0.0);
+    pitchOff.currentOptionIdx = 10;
+    for (int i = 0; i < pitchOff.options.size(); i++) {
+      if (abs(pitchOff.options[i].toFloat() - curPitchOff) < 0.1) {
+        pitchOff.currentOptionIdx = i;
+        break;
+      }
+    }
+    _settings.push_back(pitchOff);
+
     _prefs.end();
   }
 }
@@ -442,6 +487,17 @@ void SettingsScreen::saveSetting(int idx) {
       }
     }
 
+    if (item.key == "imu_roll_off") {
+      float val = -5.0f + (item.currentOptionIdx * 0.5f);
+      imuManager.setRollOffset(val);
+      imuManager.saveSettings();
+    }
+    if (item.key == "imu_pitch_off") {
+      float val = -5.0f + (item.currentOptionIdx * 0.5f);
+      imuManager.setPitchOffset(val);
+      imuManager.saveSettings();
+    }
+
   } else if (item.type == TYPE_TOGGLE) {
     // Update Pref
     // Note: putBool is done below
@@ -546,6 +602,10 @@ void SettingsScreen::update() {
         _currentMode = MODE_UTILITY;
         _ui->setTitle("UTILITY");
         loadSettings();
+      } else if (_currentMode == MODE_IMU) {
+        _currentMode = MODE_UTILITY;
+        _ui->setTitle("UTILITY");
+        loadSettings();
       } else {
         _currentMode = MODE_MAIN;
         _ui->setTitle("SETTINGS");
@@ -590,7 +650,7 @@ void SettingsScreen::update() {
   if (_currentMode == MODE_MAIN || _currentMode == MODE_RPM ||
       _currentMode == MODE_CLOCK || _currentMode == MODE_ENGINE ||
       _currentMode == MODE_GNSS_CONFIG || _currentMode == MODE_WIFI_MENU ||
-      _currentMode == MODE_UTILITY) {
+      _currentMode == MODE_UTILITY || _currentMode == MODE_IMU) {
     if (p.y >= listY && p.y < maxY) {
       if (millis() - lastSettingTouch < 200)
         return;
@@ -744,6 +804,31 @@ void SettingsScreen::handleTouch(int idx) {
       drawList(0, true);
       _ui->drawStatusBar(true);
       drawList(0, true);
+    } else if (item.name == "MPU6050 SETTING") {
+      _currentMode = MODE_IMU;
+      loadSettings();
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
+    } else if (item.name == "CALIBRATE LEVEL") {
+      // Visual feedback
+      TFT_eSPI *tft = _ui->getTft();
+      tft->fillRect(0, 100, SCREEN_WIDTH, 40, COLOR_BG);
+      tft->setTextColor(TFT_YELLOW, COLOR_BG);
+      tft->setTextDatum(MC_DATUM);
+      tft->drawString("Leveling... Keep Still", SCREEN_WIDTH / 2, 120);
+
+      delay(500);
+      imuManager.calibrateLevel();
+
+      tft->fillRect(0, 100, SCREEN_WIDTH, 40, COLOR_BG);
+      tft->setTextColor(TFT_GREEN, COLOR_BG);
+      tft->drawString("DONE!", SCREEN_WIDTH / 2, 120);
+      delay(500);
+
+      loadSettings(); // Refresh offsets in list
+      drawList(_scrollOffset, true);
     } else if (item.name == "WIFI / CLOUD") {
       _currentMode = MODE_WIFI_MENU;
       loadSettings();

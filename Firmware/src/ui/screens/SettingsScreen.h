@@ -56,7 +56,8 @@ private:
     MODE_WIFI_PASS,
     MODE_UTILITY,
     MODE_GRAPHIC_TEST,
-    MODE_ABOUT
+    MODE_ABOUT,
+    MODE_IMU
   };
   ScreenMode _currentMode;
   SessionManager::SDTestResult _sdResult;
