@@ -2,6 +2,7 @@
 #include "core/GPSManager.h"
 #include <TAMC_GT911.h>
 
+#include "core/IMUManager.h"
 #include "core/SessionManager.h"
 #include "core/SyncManager.h"
 #include "core/WiFiManager.h"
@@ -60,6 +61,7 @@ void setup() {
   // Inisialisasi Inti
   gpsManager.begin();
   sessionManager.begin();
+  imuManager.begin();
 
   // Link GPS to WiFi for Web API
   wifiManager.setGPS(&gpsManager);
@@ -83,6 +85,7 @@ void loop() {
   gpsManager.update();
 
   uiManager.update();
+  imuManager.update();
   wifiManager.update();
   // sessionManager menyimpan otomatis saat buffer flush jika diperlukan, tetapi
   // kita tulis langsung untuk saat ini

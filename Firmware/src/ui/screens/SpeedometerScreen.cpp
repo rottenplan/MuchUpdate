@@ -1,6 +1,7 @@
 #include "SpeedometerScreen.h"
 #include "../../config.h"
 #include "../../core/GPSManager.h"
+#include "../../core/IMUManager.h"
 #include "../fonts/Org_01.h"
 #include <Preferences.h>
 
@@ -16,6 +17,8 @@ void SpeedometerScreen::onShow() {
   _lastTime = "";
   _lastGear = -1;
   _lastBat = -1;
+  _lastRoll = 0;
+  _lastAccY = 0;
   _maxSpeed = 0;
   _maxRPM = 0;
   _lastSats = -1;
@@ -84,14 +87,21 @@ void SpeedometerScreen::update() {
   if (speed > _maxSpeed)
     _maxSpeed = speed;
 
+  // IMU Data
+  float roll = imuManager.getAngleX(); // Assuming X is roll based on mounting
+  float accY = imuManager.getAccY();   // Lateral G
+
   if (speed != _lastSpeed || rpm != _lastRPM || useMph != _lastUnits ||
-      timeStr != _lastTime || trip != _lastTrip || sats != _lastSats) {
+      timeStr != _lastTime || trip != _lastTrip || sats != _lastSats ||
+      abs(roll - _lastRoll) > 1.0f || abs(accY - _lastAccY) > 0.05f) {
     _lastSpeed = speed;
     _lastRPM = rpm;
     _lastUnits = useMph;
     _lastTime = timeStr;
     _lastTrip = trip;
     _lastSats = sats;
+    _lastRoll = roll;
+    _lastAccY = accY;
     drawDashboard(false);
   }
 }
@@ -184,6 +194,13 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->drawRect(rpmX - 1, rpmY - 1, rpmW + 2, rpmH + 2, TFT_DARKGREY);
     tft->setTextDatum(MR_DATUM);
     tft->drawString("RPM", rpmX - 10, rpmY + 6);
+
+    // --- IMU Labels ---
+    int imuY = 220;
+    tft->setTextColor(TFT_SILVER, colBg);
+    tft->setTextDatum(TC_DATUM);
+    tft->drawString("ROLL", SCREEN_WIDTH / 4, imuY);
+    tft->drawString("LAT G", (SCREEN_WIDTH * 3) / 4, imuY);
   }
 
   // --- DYNAMIC UPDATES ---
@@ -272,6 +289,20 @@ void SpeedometerScreen::drawDashboard(bool force) {
   tft->setTextPadding(60);
   sprintf(buf, "%d", _lastRPM);
   tft->drawString(buf, rpmX + rpmW + 10, rpmY + 6);
+
+  // 5. IMU VALUES
+  int imuValY = 245;
+  tft->setTextFont(4);
+  tft->setTextColor(colText, colBg);
+  tft->setTextDatum(TC_DATUM);
+
+  tft->setTextPadding(100);
+  sprintf(buf, "%.0f*", _lastRoll); // * for degree symbol
+  tft->drawString(buf, SCREEN_WIDTH / 4, imuValY);
+
+  sprintf(buf, "%.2fG", _lastAccY);
+  tft->drawString(buf, (SCREEN_WIDTH * 3) / 4, imuValY);
+  tft->setTextPadding(0);
 
   // --- FONT SAFETY ---
   tft->setTextSize(1);

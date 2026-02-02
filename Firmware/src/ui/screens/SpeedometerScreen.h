@@ -24,6 +24,8 @@ private:
   int _lastGear = -1;
   int _lastBat = -1;
   bool _lastUnits = false; // false = km/h, true = mph
+  float _lastRoll = 0;
+  float _lastAccY = 0;
 };
 
 #endif
