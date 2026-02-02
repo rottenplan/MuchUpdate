@@ -1948,11 +1948,6 @@ void LapTimerScreen::drawRacingStatic() {
 
   // 1. RPM BAR (PRO LOOK)
   tft->drawRoundRect(5, rpmY, SCREEN_WIDTH - 10, rpmH, 5, TFT_DARKGREY);
-  // RPM Labels (0-10k) - Tiny dots
-  for (int i = 1; i < 10; i++) {
-    int dx = 5 + (i * (SCREEN_WIDTH - 10) / 10);
-    tft->drawFastVLine(dx, rpmY + rpmH - 4, 3, TFT_SILVER);
-  }
 
   // 2. LEFT COLUMN: TRACK INFO
   int leftX = 5;
@@ -2190,7 +2185,9 @@ void LapTimerScreen::drawRacing() {
     tft->setTextFont(2);
     tft->setTextSize(1);
     tft->setTextDatum(MC_DATUM);
-    tft->drawString("WAITING FOR LAP 2...", SCREEN_WIDTH / 2, footerY + 40);
+    if ((millis() / 500) % 2 == 0) {
+      tft->drawString("WAITING FOR LAP 2...", SCREEN_WIDTH / 2, footerY + 40);
+    }
   }
 
   // --- FINAL CLEANUP (Prevent font leaks) ---
