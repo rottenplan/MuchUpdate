@@ -49,7 +49,7 @@ void sdProgressCallback(int percent, String status) {
 }
 
 void SettingsScreen::onShow() {
-  _selectedIdx = -1;
+  _selectedIdx = 0;
   _lastSelectedIdx = -1;
   _scrollOffset = 0;        // Reset scroll
   _currentMode = MODE_MAIN; // Start at Main
@@ -323,11 +323,14 @@ void SettingsScreen::loadSettings() {
     _settings.push_back({"TFT BENCHMARK", TYPE_ACTION});
 
     // MPU6050 Setting
-    _settings.push_back({"MPU6050 SETTING", TYPE_ACTION});
+    _settings.push_back({"G-FORCE CALIBRATION", TYPE_ACTION});
 
     _prefs.end();
   } else if (_currentMode == MODE_IMU) {
-    _prefs.begin("laptimer", false);
+    // 0. IMU Sensor Toggle
+    SettingItem imuOnOff = {"IMU SENSOR", TYPE_TOGGLE, "imu_enabled"};
+    imuOnOff.checkState = _prefs.getBool("imu_enabled", true);
+    _settings.push_back(imuOnOff);
 
     // 1. Calibrate Level (Action)
     _settings.push_back({"CALIBRATE LEVEL", TYPE_ACTION});
@@ -524,6 +527,11 @@ void SettingsScreen::saveSetting(int idx) {
 
     if (item.key == "debug_touch") {
       _ui->setDebugTouch(item.checkState);
+    }
+
+    if (item.key == "imu_enabled") {
+      imuManager.setEnabled(item.checkState);
+      imuManager.saveSettings();
     }
 
     _prefs.putBool(item.key.c_str(), item.checkState);
@@ -804,7 +812,7 @@ void SettingsScreen::handleTouch(int idx) {
       drawList(0, true);
       _ui->drawStatusBar(true);
       drawList(0, true);
-    } else if (item.name == "MPU6050 SETTING") {
+    } else if (item.name == "G-FORCE CALIBRATION") {
       _currentMode = MODE_IMU;
       loadSettings();
       _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,

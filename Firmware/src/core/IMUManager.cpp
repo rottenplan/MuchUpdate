@@ -5,6 +5,7 @@ IMUManager::IMUManager() : _mpu(Wire), _isConnected(false), _lastUpdate(0) {
   _angleX = _angleY = _angleZ = 0;
   _accX = _accY = _accZ = 0;
   _rollOffset = _pitchOffset = 0;
+  _isEnabled = true;
 }
 
 void IMUManager::begin() {
@@ -16,11 +17,12 @@ void IMUManager::begin() {
     Serial.println("MPU6050: Connected!");
     _mpu.calcOffsets(); // Initial sensor calibration
 
-    // Load user offsets
+    // Load user offsets and enabled state
     Preferences prefs;
     prefs.begin("laptimer", true);
     _rollOffset = prefs.getFloat("imu_roll_off", 0.0);
     _pitchOffset = prefs.getFloat("imu_pitch_off", 0.0);
+    _isEnabled = prefs.getBool("imu_enabled", true);
     prefs.end();
   } else {
     _isConnected = false;
@@ -30,7 +32,7 @@ void IMUManager::begin() {
 }
 
 void IMUManager::update() {
-  if (!_isConnected)
+  if (!_isConnected || !_isEnabled)
     return;
 
   if (millis() - _lastUpdate > 10) { // 100Hz update rate
@@ -73,6 +75,7 @@ void IMUManager::saveSettings() {
   prefs.begin("laptimer", false);
   prefs.putFloat("imu_roll_off", _rollOffset);
   prefs.putFloat("imu_pitch_off", _pitchOffset);
+  prefs.putBool("imu_enabled", _isEnabled);
   prefs.end();
 }
 

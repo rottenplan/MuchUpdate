@@ -130,9 +130,9 @@ void DragMeterScreen::update() {
       // 2. Menu Logic
       if (_state == STATE_MENU) {
         int startY = 60;
-        int btnHeight = 50;
+        int btnHeight = 55;
         int btnWidth = 360;
-        int gap = 8;
+        int gap = 10;
         int x = (SCREEN_WIDTH - btnWidth) / 2;
 
         // Check if X is within button width (centered)
@@ -167,10 +167,10 @@ void DragMeterScreen::update() {
         }
       } else if (_state == STATE_DRAG_MODE_MENU) {
         // Drag Mode Menu Logic (Similar to Main Menu)
-        int startY = 55;
-        int btnHeight = 35;
-        int btnWidth = 240;
-        int gap = 8;
+        int startY = 60;
+        int btnHeight = 55;
+        int btnWidth = 360;
+        int gap = 10;
         int x = (SCREEN_WIDTH - btnWidth) / 2;
 
         if (p.x > x && p.x < x + btnWidth) {
@@ -221,13 +221,15 @@ void DragMeterScreen::update() {
 
   if (_state == STATE_PREDICTIVE_MENU) {
     int touchedIdx = -1;
-    int listY = 60;
-    int itemH = 50;
+    int startY = 60;
+    int btnHeight = 55;
+    int btnWidth = 360;
     int gap = 10;
+    int x = (SCREEN_WIDTH - btnWidth) / 2;
 
     for (int i = 0; i < _predictiveItems.size(); i++) {
-      int y = listY + i * (itemH + gap);
-      if (p.y >= y && p.y < y + itemH && p.x >= 10 && p.x < SCREEN_WIDTH - 10) {
+      int y = startY + (i * (btnHeight + gap));
+      if (p.y >= y && p.y < y + btnHeight && p.x >= x && p.x < x + btnWidth) {
         touchedIdx = i;
         break;
       }
@@ -992,9 +994,9 @@ void DragMeterScreen::drawMenu() {
   tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
 
   int startY = 60;
-  int btnHeight = 50;
+  int btnHeight = 55;
   int btnWidth = 360;
-  int gap = 8;
+  int gap = 10;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   for (int i = 0; i < _menuItems.size(); i++) {
@@ -1032,9 +1034,9 @@ void DragMeterScreen::drawDragModeMenu() {
   tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
 
   int startY = 60;
-  int btnHeight = 50;
+  int btnHeight = 55;
   int btnWidth = 360;
-  int gap = 8;
+  int gap = 10;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   for (int i = 0; i < _dragModeItems.size(); i++) {
@@ -1065,10 +1067,10 @@ void DragMeterScreen::drawPredictiveMenu() {
 
   tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
 
-  int startY = 55;
-  int btnHeight = 35;
-  int btnWidth = 240;
-  int gap = 8;
+  int startY = 60;
+  int btnHeight = 55;
+  int btnWidth = 360;
+  int gap = 10;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   for (int i = 0; i < _predictiveItems.size(); i++) {

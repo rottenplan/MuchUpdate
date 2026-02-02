@@ -22,6 +22,9 @@ public:
 
   bool isConnected() { return _isConnected; }
 
+  bool isEnabled() { return _isEnabled; }
+  void setEnabled(bool enabled) { _isEnabled = enabled; }
+
   void setRollOffset(float offset) { _rollOffset = offset; }
   float getRollOffset() { return _rollOffset; }
   void setPitchOffset(float offset) { _pitchOffset = offset; }
@@ -33,6 +36,7 @@ public:
 private:
   MPU6050 _mpu;
   bool _isConnected;
+  bool _isEnabled;
   float _angleX, _angleY, _angleZ;
   float _accX, _accY, _accZ;
   float _rollOffset, _pitchOffset;

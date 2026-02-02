@@ -13,13 +13,12 @@ const char *menuLabels[MENU_ITEMS] = {"LAP TIMER",   "DRAG METER", "RPM SENSOR",
                                       "SETTINGS",    "SYNCHRONIZE"};
 
 void MenuScreen::onShow() {
-  _selectedIndex = -1;
+  _selectedIndex = 0;
   _lastSelectedIndex = -1;
   _lastTouchTime = 0;
   // _currentPage = 0; // Removing reset to remember last page
   _touchStartY = -1;
   _lastTapIdx = -1;
-  _lastTapTime = 0;
   _lastTapTime = 0;
 
   // Draw Static Layout (Background & Title)
