@@ -60,8 +60,9 @@ void LapTimerScreen::onShow() {
   // Start in Sub-Menu
   _state = STATE_MENU;
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(_ui->getBackgroundColor()); // Ensure clean background
-  gpsManager.setRawDataCallback(nullptr);     // Ensure no log overlay
+  // tft->fillScreen(_ui->getBackgroundColor()); // REDUNDANT - UIManager
+  // already clears
+  gpsManager.setRawDataCallback(nullptr); // Ensure no log overlay
   _needsStaticRedraw = true;
   drawMenu();
 
@@ -735,7 +736,9 @@ void LapTimerScreen::update() {
       if (p.x < 100 && p.y > 240) {
         _state = STATE_RECORD_TRACK;
         _recordingState = RECORD_COMPLETE;
-        _ui->getTft()->fillScreen(_ui->getBackgroundColor());
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                _ui->getBackgroundColor());
         drawRecordTrack();
       }
     }
@@ -1914,7 +1917,8 @@ void LapTimerScreen::drawSummary() {
 
 void LapTimerScreen::drawRacingStatic() {
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillScreen(TFT_BLACK);
+  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
 
   // --- FONT SAFETY ---
   tft->setTextSize(1);
@@ -2706,7 +2710,8 @@ void LapTimerScreen::drawSaveTrackName(bool force) {
   TFT_eSPI *tft = _ui->getTft();
 
   if (force) {
-    tft->fillScreen(_ui->getBackgroundColor());
+    tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, _ui->getBackgroundColor());
 
     // Title
     tft->setTextFont(1);
