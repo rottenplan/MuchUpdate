@@ -125,18 +125,18 @@ void SpeedometerScreen::drawDashboard(bool force) {
   uint16_t colCardBorder = TFT_DARKGREY;
 
   // Layout Constants (Optimized for 480x320)
-  int cardY = 25; // Moved UP (Status bar is 20)
-  int cardH = 50; // Taller to fit content
+  int cardY = 25;
+  int cardH = 50;
   int cardW = 130;
   int gap = 15;
-  int startX = 25; // 25 + 130 + 15 + 130 + 15 + 130 + 25 = 470
+  int startX = 25;
+  int bottomCardY = 210; // New card row height
 
   // Y Positions
-  int valY = cardY + 30; // Center values in card
-  int speedY = 140;      // Moved DOWN (was 115) to avoid overlap
+  int valY = cardY + 30;
+  int bottomValY = bottomCardY + 30;
+  int speedY = 140;
   int unitY = speedY + 50;
-  int tripLabelY = unitY + 30;
-  int tripValY = tripLabelY + 20;
 
   if (force) {
     // Clear Content
@@ -151,6 +151,13 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->drawRoundRect(startX + (cardW + gap) * 2, cardY, cardW, cardH, 6,
                        colCardBorder);
 
+    // --- BOTTOM DATA CARDS ---
+    tft->drawRoundRect(startX, bottomCardY, cardW, cardH, 6, colCardBorder);
+    tft->drawRoundRect(startX + cardW + gap, bottomCardY, cardW, cardH, 6,
+                       colCardBorder);
+    tft->drawRoundRect(startX + (cardW + gap) * 2, bottomCardY, cardW, cardH, 6,
+                       colCardBorder);
+
     // --- LABELS (Inside Cards, Top) ---
     tft->setFreeFont(&Org_01);
     tft->setTextSize(1);
@@ -158,32 +165,26 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->setTextDatum(TC_DATUM);
 
     int labelY = cardY + 4;
+    int bottomLabelY = bottomCardY + 4;
+
+    // Top Labels
     tft->drawString("MAX RPM", startX + (cardW / 2), labelY);
     tft->drawString("MAX SPEED", startX + cardW + gap + (cardW / 2), labelY);
     tft->drawString("SATELLITES", startX + (cardW + gap) * 2 + (cardW / 2),
                     labelY);
+
+    // Bottom Labels
+    tft->drawString("DISTANCE", startX + (cardW / 2), bottomLabelY);
+    tft->drawString("ROLL ANGLE", startX + cardW + gap + (cardW / 2),
+                    bottomLabelY);
+    tft->drawString("LAT G-FORCE", startX + (cardW + gap) * 2 + (cardW / 2),
+                    bottomLabelY);
 
     // --- UNIT ---
     tft->setTextFont(2);
     tft->setTextSize(1);
     tft->setTextColor(colPrimary, colBg);
     tft->drawCentreString("km/h", SCREEN_WIDTH / 2, unitY, 1);
-
-    // --- TRIP METER CARD ---
-    int tripBoxW = 200;
-    int tripBoxH = 50;
-    int tripBoxX = (SCREEN_WIDTH - tripBoxW) / 2;
-    int tripBoxY = unitY + 25; // Spacing below unit
-
-    tft->drawRoundRect(tripBoxX, tripBoxY, tripBoxW, tripBoxH, 6,
-                       colCardBorder);
-
-    // Label
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(1);
-    tft->setTextColor(TFT_SILVER, colBg);
-    tft->setTextDatum(TC_DATUM);
-    tft->drawString("TRIP DISTANCE", SCREEN_WIDTH / 2, tripBoxY + 5);
 
     // --- RPM BAR OUTLINE ---
     int rpmY = 290;
@@ -194,31 +195,21 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->drawRect(rpmX - 1, rpmY - 1, rpmW + 2, rpmH + 2, TFT_DARKGREY);
     tft->setTextDatum(MR_DATUM);
     tft->drawString("RPM", rpmX - 10, rpmY + 6);
-
-    // --- IMU Labels ---
-    int imuY = 220;
-    tft->setTextColor(TFT_SILVER, colBg);
-    tft->setTextDatum(TC_DATUM);
-    tft->drawString("ROLL", SCREEN_WIDTH / 4, imuY);
-    tft->drawString("LAT G", (SCREEN_WIDTH * 3) / 4, imuY);
   }
 
   // --- DYNAMIC UPDATES ---
   char buf[32];
 
-  // 1. UPDATE CARDS VALUES
-  // Use Font 4 but handle padding carefully
   tft->setTextDatum(MC_DATUM);
   tft->setTextColor(colText, colBg);
   tft->setTextFont(4);
   tft->setTextSize(1);
-
-  // Padding - Use Background Color to clear
-  // To avoid box overlap, we must clamp padding or use fillRect
   int padW = cardW - 10;
 
-  // Max RPM
+  // 1. UPDATE TOP CARDS
   tft->setTextPadding(padW);
+
+  // Max RPM
   sprintf(buf, "%d", _maxRPM);
   tft->drawString(buf, startX + (cardW / 2), valY);
 
@@ -229,59 +220,44 @@ void SpeedometerScreen::drawDashboard(bool force) {
   // Sats
   sprintf(buf, "%d", _lastSats);
   tft->drawString(buf, startX + (cardW + gap) * 2 + (cardW / 2), valY);
+
+  // 2. UPDATE BOTTOM CARDS
+  // Distance
+  sprintf(buf, "%.1f", _lastTrip);
+  tft->drawString(buf, startX + (cardW / 2), bottomValY);
+
+  // Roll
+  sprintf(buf, "%.0f*", _lastRoll);
+  tft->drawString(buf, startX + cardW + gap + (cardW / 2), bottomValY);
+
+  // Lat G
+  sprintf(buf, "%.2fG", _lastAccY);
+  tft->drawString(buf, startX + (cardW + gap) * 2 + (cardW / 2), bottomValY);
+
   tft->setTextPadding(0);
 
-  // 2. MAIN SPEED
+  // 3. MAIN SPEED
   tft->setTextFont(7); // 7-Segment
   tft->setTextSize(2);
   tft->setTextColor(colPrimary, colBg);
   tft->setTextDatum(MC_DATUM);
-
-  // Use fillRect to clear previous speed strictly within the speed area
-  // to avoid clearing the cards above if font is huge
-  // Font 7 Size 2 is approx 100px high
-  // Y=140. Top=90. Bottom=190.
-  // Previous overlap was hitting Y=80 (Card bottom)
-
-  // Only redraw if changed? The caller handles that check usually,
-  // but force means everything. This 'if(!force)' block is for updates.
-  // Actually, the caller logic:
-  // if (speed != _lastSpeed ... ) drawDashboard(false);
-  // So we are safe to draw.
-
   tft->setTextPadding(SCREEN_WIDTH);
   sprintf(buf, "%.0f", _lastSpeed);
   tft->drawString(buf, SCREEN_WIDTH / 2, speedY);
   tft->setTextPadding(0);
 
-  // 3. TRIP VALUE
-  // Recalculate Y based on new Box logic
-  int tripBoxY = unitY + 25;
-  tripValY = tripBoxY + 28; // Lower half of box
-
-  tft->setTextFont(4);
-  tft->setTextSize(1);
-  tft->setTextColor(colText, colBg);
-
-  tft->setTextPadding(180); // Clear width of box interior
-  sprintf(buf, "%04.1f", _lastTrip);
-  tft->drawString(buf, SCREEN_WIDTH / 2, tripValY);
-  tft->setTextPadding(0);
-
-  // 4. RPM BAR & VALUE
+  // 4. RPM BAR
   int rpmY = 290;
   int rpmH = 12;
   int rpmW = 400;
   int rpmX = (SCREEN_WIDTH - rpmW) / 2;
 
-  // Draw Fill
   int fillW = map(constrain(_lastRPM, 0, 9000), 0, 9000, 0, rpmW);
   if (fillW > 0)
     tft->fillRect(rpmX, rpmY, fillW, rpmH, colPrimary);
   if (fillW < rpmW)
     tft->fillRect(rpmX + fillW, rpmY, rpmW - fillW, rpmH, colBg);
 
-  // RPM Value
   tft->setTextFont(2);
   tft->setTextSize(1);
   tft->setTextColor(colText, colBg);
@@ -289,20 +265,6 @@ void SpeedometerScreen::drawDashboard(bool force) {
   tft->setTextPadding(60);
   sprintf(buf, "%d", _lastRPM);
   tft->drawString(buf, rpmX + rpmW + 10, rpmY + 6);
-
-  // 5. IMU VALUES
-  int imuValY = 245;
-  tft->setTextFont(4);
-  tft->setTextColor(colText, colBg);
-  tft->setTextDatum(TC_DATUM);
-
-  tft->setTextPadding(100);
-  sprintf(buf, "%.0f*", _lastRoll); // * for degree symbol
-  tft->drawString(buf, SCREEN_WIDTH / 4, imuValY);
-
-  sprintf(buf, "%.2fG", _lastAccY);
-  tft->drawString(buf, (SCREEN_WIDTH * 3) / 4, imuValY);
-  tft->setTextPadding(0);
 
   // --- FONT SAFETY ---
   tft->setTextSize(1);
