@@ -1942,8 +1942,9 @@ void LapTimerScreen::drawRacingStatic() {
   int midY = rpmY + rpmH + 6;
   int dashH = 180;
 
-  // THREE COLUMN SYSTEM
-  int colW = SCREEN_WIDTH / 3; // 160px each
+  // ASYMMETRIC COLUMN SYSTEM (Optimized for Huge Speed)
+  int sideW = 140;
+  int centerW = SCREEN_WIDTH - (sideW * 2); // 200px
 
   // 1. RPM BAR (PRO LOOK)
   tft->drawRoundRect(5, rpmY, SCREEN_WIDTH - 10, rpmH, 5, TFT_DARKGREY);
@@ -1955,7 +1956,7 @@ void LapTimerScreen::drawRacingStatic() {
 
   // 2. LEFT COLUMN: TRACK INFO
   int leftX = 5;
-  int leftW = colW - 10;
+  int leftW = sideW - 10;
   tft->fillRoundRect(leftX, midY, leftW, dashH, 8, 0x18E3); // Charcoal
 
   tft->setTextColor(TFT_SILVER, 0x18E3);
@@ -1972,8 +1973,8 @@ void LapTimerScreen::drawRacingStatic() {
   tft->drawString("SATS", leftX + 10, midY + 125);
 
   // 3. CENTER COLUMN: SPEED & DELTA
-  int centerX = colW + 5;
-  int centerW = colW - 10;
+  int centerX = sideW + 5;
+  int centerW_box = centerW - 10;
   // Speed Zone (Huge)
   tft->setTextColor(TFT_SILVER, TFT_BLACK);
   tft->setTextFont(2);
@@ -1981,8 +1982,8 @@ void LapTimerScreen::drawRacingStatic() {
   tft->drawString("KM/H", SCREEN_WIDTH / 2, midY + dashH - 10);
 
   // 4. RIGHT COLUMN: LAP TIME
-  int rightX = (colW * 2) + 5;
-  int rightW = colW - 10;
+  int rightX = sideW + centerW + 5;
+  int rightW = sideW - 10;
   tft->fillRoundRect(rightX, midY, rightW, dashH, 8, 0x18E3); // Charcoal
 
   tft->setTextColor(TFT_SILVER, 0x18E3);
@@ -2049,7 +2050,8 @@ void LapTimerScreen::drawRacing() {
   int rpmH = 22;
   int midY = rpmY + rpmH + 6;
   int dashH = 180;
-  int colW = SCREEN_WIDTH / 3;
+  int sideW = 140;
+  int centerW = SCREEN_WIDTH - (sideW * 2);
   int footerY = midY + dashH + 5;
 
   uint16_t cardBg = 0x18E3; // Charcoal
@@ -2074,21 +2076,22 @@ void LapTimerScreen::drawRacing() {
     speed *= 0.621371;
 
   if (abs(speed - _lastSpeed) > 0.1) { // Lower threshold
-    tft->setTextSize(1);
-    tft->setTextFont(7); // Massive Digital
+    tft->setTextFont(7);               // Massive Digital
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
     tft->setTextDatum(MC_DATUM);
+    tft->setTextSize(2); // ENLARGED
     // Explicitly clear speed area to prevent ghosting
-    tft->fillRect(colW + 10, midY + 30, colW - 20, 110,
-                  TFT_BLACK); // Larger clear area
+    int centerX = sideW + 5;
+    tft->fillRect(centerX, midY + 25, centerW - 10, 120, TFT_BLACK);
     tft->drawString(String((int)speed), SCREEN_WIDTH / 2, midY + 85);
     _lastSpeed = speed;
 
+    tft->setTextSize(1); // Reset
     tft->setTextFont(1); // Safety Reset
   }
 
   // --- 3. SESSION INFO (Left Column) ---
-  int sidePad = colW - 20;
+  int sidePad = sideW - 20;
   // Max Speed update
   if (abs(_maxSpeedSessionRender - _maxSpeedSession) > 0.1) {
     tft->setTextColor(TFT_WHITE, cardBg);
@@ -2126,8 +2129,9 @@ void LapTimerScreen::drawRacing() {
     tft->setTextColor(TFT_WHITE, cardBg);
     tft->setTextFont(2);
     tft->setTextDatum(TL_DATUM);
-    tft->setTextPadding(colW - 25);
-    tft->drawString(text, (colW * 2) + 15, midY + 42);
+    tft->setTextPadding(sideW - 25);
+    int rightX = sideW + centerW + 5;
+    tft->drawString(text, rightX + 10, midY + 42);
     _lastLastLapTimeRender = _lastLapTime;
   }
   // BEST LAP
@@ -2144,8 +2148,9 @@ void LapTimerScreen::drawRacing() {
     tft->setTextColor(TFT_GOLD, cardBg); // Gold for Best
     tft->setTextFont(2);
     tft->setTextDatum(TL_DATUM);
-    tft->setTextPadding(colW - 25);
-    tft->drawString(text, (colW * 2) + 15, midY + 92);
+    tft->setTextPadding(sideW - 25);
+    int rightX = sideW + centerW + 5;
+    tft->drawString(text, rightX + 10, midY + 92);
     _lastBestLapTimeRender = _bestLapTime;
   }
 
