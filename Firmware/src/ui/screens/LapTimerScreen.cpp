@@ -26,7 +26,6 @@ void LapTimerScreen::onShow() {
   _state = STATE_TRACK_LIST; // Mulai di Pilihan Track
   _raceMode = MODE_BEST;     // Default mode
   _bestLapTime = 0;
-  _bestLapTime = 0;
   _lapTimes.clear();
   _listScroll = 0;
   _menuSelectionIdx = -1;
@@ -73,8 +72,6 @@ void LapTimerScreen::onShow() {
   // Ignoring for now to keep startup fast. Future: User selects "Load
   // Reference".
 }
-
-#include <ArduinoJson.h>
 
 #include <ArduinoJson.h>
 
@@ -1956,7 +1953,7 @@ void LapTimerScreen::drawRacingStatic() {
     tft->drawFastVLine(dx, rpmY + rpmH - 4, 3, TFT_SILVER);
   }
 
-  // 2. LEFT COLUMN: TRACK INFO & STATS
+  // 2. LEFT COLUMN: TRACK INFO
   int leftX = 5;
   int leftW = colW - 10;
   tft->fillRoundRect(leftX, midY, leftW, dashH, 8, 0x18E3); // Charcoal
@@ -1968,6 +1965,7 @@ void LapTimerScreen::drawRacingStatic() {
   tft->drawFastHLine(leftX + 10, midY + 16, leftW - 20, TFT_DARKGREY);
 
   // Labels for left column
+  tft->setTextFont(1);
   tft->setTextDatum(TL_DATUM);
   tft->drawString("MAX SPD", leftX + 10, midY + 25);
   tft->drawString("G-FORCE", leftX + 10, midY + 75);
@@ -1982,20 +1980,22 @@ void LapTimerScreen::drawRacingStatic() {
   tft->setTextDatum(BC_DATUM);
   tft->drawString("KM/H", SCREEN_WIDTH / 2, midY + dashH - 10);
 
-  // 4. RIGHT COLUMN: LAP TIMES
+  // 4. RIGHT COLUMN: LAP TIME
   int rightX = (colW * 2) + 5;
   int rightW = colW - 10;
   tft->fillRoundRect(rightX, midY, rightW, dashH, 8, 0x18E3); // Charcoal
 
   tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->setTextFont(1);
   tft->setTextDatum(TC_DATUM);
-  tft->drawString("LAP TIMES", rightX + rightW / 2, midY + 5);
+  tft->drawString("LAP TIME", rightX + rightW / 2, midY + 5);
   tft->drawFastHLine(rightX + 10, midY + 16, rightW - 20, TFT_DARKGREY);
 
   // Labels for right column
+  tft->setTextFont(1);
   tft->setTextDatum(TL_DATUM);
-  tft->drawString("LAST", rightX + 10, midY + 28);  // Lowered
-  tft->drawString("BEST", rightX + 10, midY + 108); // Lowered
+  tft->drawString("LAST", rightX + 10, midY + 25);
+  tft->drawString("BEST", rightX + 10, midY + 75);
 
   // --- 5. BOTTOM AREA: CONTROL & PREDICTIVE ---
   int footerY = midY + dashH + 5;
@@ -2127,7 +2127,7 @@ void LapTimerScreen::drawRacing() {
     tft->setTextFont(2);
     tft->setTextDatum(TL_DATUM);
     tft->setTextPadding(colW - 25);
-    tft->drawString(text, (colW * 2) + 15, midY + 54); // More space from label
+    tft->drawString(text, (colW * 2) + 15, midY + 42);
     _lastLastLapTimeRender = _lastLapTime;
   }
   // BEST LAP
@@ -2145,7 +2145,7 @@ void LapTimerScreen::drawRacing() {
     tft->setTextFont(2);
     tft->setTextDatum(TL_DATUM);
     tft->setTextPadding(colW - 25);
-    tft->drawString(text, (colW * 2) + 15, midY + 134); // More space from label
+    tft->drawString(text, (colW * 2) + 15, midY + 92);
     _lastBestLapTimeRender = _bestLapTime;
   }
 
