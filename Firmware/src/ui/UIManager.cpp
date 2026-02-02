@@ -543,6 +543,9 @@ void UIManager::drawStatusBar(bool force) {
     else {
       lastPct = (int)((lastVolts - 3.0) / (4.2 - 3.0) * 100);
     }
+    // Debug
+    // Serial.printf("BAT: %.2fV (ADC: %d) PCT: %d%%\n", lastVolts, rawADC,
+    // lastPct);
   }
 #endif
 
@@ -550,7 +553,7 @@ void UIManager::drawStatusBar(bool force) {
   float voltage = lastVolts;
 
   // Charging Detection (Voltage based)
-  bool isCharging = (voltage > 4.15f);
+  bool isCharging = (voltage > 4.10f);
 
 #ifdef PIN_BATTERY
   if (force || abs(pct - _lastBat) > 2 || isCharging != _wasCharging) {
