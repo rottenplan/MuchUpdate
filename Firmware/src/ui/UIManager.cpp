@@ -39,6 +39,7 @@ UIManager::UIManager(TFT_eSPI *tft) : _tft(tft), _touch(nullptr) {
   _lastSignalStrength = -1;
   _lastBat = -1;
   _lastLogging = false;
+  _wasCharging = false;
   _lastWifiStatus = -1;
   _isDarkMode = true;        // Default Dark
   _debugTouchEnabled = true; // FORCE ENABLE DEBUG
@@ -109,14 +110,17 @@ void UIManager::begin() {
   }
   setAutoOff(ms);
 
-  // Load debug touch setting
+  // Load brightness setting from prefs
   prefs.begin("laptimer", true);
-  _debugTouchEnabled = prefs.getBool("debug_touch", false);
+  int bIdx = prefs.getInt("brightness", 9); // Default 100% (index 9)
   prefs.end();
+
+  // Map 0-9 (10%-100%) to PWM duty cycle 26-255
+  int duty = map(bIdx, 0, 9, 26, 255);
+  setBrightness(duty);
+
   _lastInteractionTime = millis();
   _isScreenOff = false;
-  _currentBrightness = 255; // Default max, should load from prefs if we had a
-                            // stored brightness variable
 
   _lastTapTime = 0;
   _wasTouched = false;
@@ -197,8 +201,8 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     if (x1 == 0 && y1 == 0)
       return p;
 
-    // 2. Stability Delay (Short wait to filter transient electrical spikes)
-    delay(20);
+    // 2. Stability Delay (Reduced to 5ms for better responsiveness)
+    delay(5);
 
     // 3. Verification Read
     _touch->read();
@@ -211,14 +215,12 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
     int y2 = _touch->points[0].y;
 
     // 4. Coordinate Consistency Check
-    // Ghost touches often jump wildly. Real touches are stable.
-    // Calculate distance squared to avoid sqrt
     int dx = x1 - x2;
     int dy = y1 - y2;
     int distSq = dx * dx + dy * dy;
 
-    // Threshold: 20px variance allowed (finger wiggle)
-    if (distSq > 400) {
+    // Threshold: Increased slightly to 30px variance (distSq 900)
+    if (distSq > 900) {
       return p; // Inconsistent coordinates -> Noise
     }
 
@@ -243,6 +245,10 @@ UIManager::TouchPoint UIManager::getTouchPoint() {
 
     p.x = pX;
     p.y = pY;
+
+    if (_debugTouchEnabled) {
+      Serial.printf("TOUCH: Raw[%d,%d] Proc[%d,%d]\n", x2, y2, p.x, p.y);
+    }
 
     // Safety Clamp
     if (p.x < 0)
@@ -543,24 +549,16 @@ void UIManager::drawStatusBar(bool force) {
   int pct = lastPct;
   float voltage = lastVolts;
 
-  // Percentage Calculation (Linear 3.0V - 4.2V)
-  // Max = 4.2, Min = 3.0
-  // (Logic moved above)
+  // Charging Detection (Voltage based)
+  bool isCharging = (voltage > 4.15f);
 
 #ifdef PIN_BATTERY
-  if (force || abs(pct - _lastBat) > 2) { // Update if changed by > 2%
+  if (force || abs(pct - _lastBat) > 2 || isCharging != _wasCharging) {
     _lastBat = pct;
+    _wasCharging = isCharging;
 
-    // Hapus Area Bar + Teks
-    // Area Kanan: 60px lebar?
-    _tft->fillRect(SCREEN_WIDTH - 60, 0, 60, 20, getBackgroundColor());
-
-    // Gambar Teks Persentase
-    _tft->setTextDatum(MR_DATUM); // Rata Kanan Tengah
-    _tft->setTextSize(1);
-    _tft->setTextColor(getTextColor(), getBackgroundColor());
-    String pctStr = String(pct) + "%";
-    _tft->drawString(pctStr, SCREEN_WIDTH - 32, 10); // Centered at 10
+    // Hapus Area Bar + Teks (65px lebar)
+    _tft->fillRect(SCREEN_WIDTH - 65, 0, 65, 20, getBackgroundColor());
 
     // Gambar Ikon Baterai
     int batX = SCREEN_WIDTH - 28; // Geser sedikit ke kiri
@@ -573,12 +571,30 @@ void UIManager::drawStatusBar(bool force) {
 
     // Isi Level
     int innerW = batW - 4;
-    int fillW = (innerW * pct) / 100;
+    int fillW = (innerW * (pct > 100 ? 100 : pct)) / 100;
 
     if (pct > 20)
       _tft->fillRect(batX + 2, batY + 2, fillW, batH - 4, TFT_GREEN);
     else
       _tft->fillRect(batX + 2, batY + 2, fillW, batH - 4, TFT_RED);
+
+    // Gambar Ikon Petir (Charging)
+    if (isCharging) {
+      int boltX = batX - 12;
+      int boltY = 4;
+      // Lightning bolt using triangles
+      _tft->fillTriangle(boltX + 3, boltY, boltX, boltY + 6, boltX + 4,
+                         boltY + 5, TFT_YELLOW);
+      _tft->fillTriangle(boltX + 1, boltY + 11, boltX + 4, boltY + 5, boltX,
+                         boltY + 6, TFT_YELLOW);
+    }
+
+    // Gambar Teks Persentase
+    _tft->setTextDatum(MR_DATUM); // Rata Kanan Tengah
+    _tft->setTextSize(1);
+    _tft->setTextColor(getTextColor(), getBackgroundColor());
+    String pctStr = String(pct) + "%";
+    _tft->drawString(pctStr, batX - (isCharging ? 14 : 4), 10);
 
     _lastBat = pct;
   }
@@ -596,6 +612,13 @@ void UIManager::drawStatusBar(bool force) {
     }
     _lastLogging = isLogging;
   }
+
+  // --- FONT SAFETY CLEANUP ---
+  // Reset global font state so other UI elements don't inherit large sizes
+  _tft->setTextSize(1);
+  _tft->setFreeFont(NULL);
+  _tft->setTextFont(1);
+  _tft->setTextPadding(0);
 }
 
 // --- Auto Off Logic ---

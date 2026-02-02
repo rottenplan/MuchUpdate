@@ -115,6 +115,12 @@ void GpsDebugScreen::drawDebugInfo() {
   sprintf(buf, "%.1f / %.0f m", speed, alt);
   tft->setTextColor(TFT_SKYBLUE, 0x10A2);
   tft->drawString(buf, cardX + 110, textY);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void GpsDebugScreen::update() {

@@ -246,4 +246,10 @@ void TimeSettingScreen::drawScreen() {
                     TFT_LIGHTGREY);
 
   _ui->drawStatusBar();
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }

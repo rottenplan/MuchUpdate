@@ -603,6 +603,12 @@ void DragMeterScreen::drawChristmasTreeOverlay() {
     tft->fillCircle(cx, cy + 100, 20, TFT_YELLOW);
 
   // Green (Handled by state switch, but last frame)
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void DragMeterScreen::handleMenuTouch(int idx) {
@@ -788,7 +794,6 @@ void DragMeterScreen::drawDashboardDynamic() {
   tft->setTextSize(1); // Standard size for font 7
   // We need to verify if Font 7 is available or usage. Org_01 is tiny.
   // Use FreeFont if needed or standard font numbers.
-  // Let's try font 6 or 7 if available, otherwise large scaled FreeFont.
   // Assuming Font 6 (large numeric) is available in TFT_eSPI default.
   tft->drawString(String(_currentSpeed, 1), SCREEN_WIDTH / 2 - 20, 50);
 
@@ -827,6 +832,12 @@ void DragMeterScreen::drawDashboardDynamic() {
   tft->setTextSize(1);
   tft->setTextDatum(TL_DATUM);
   tft->drawString(String(_slope, 1) + "%", 40, SCREEN_HEIGHT - 25);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void DragMeterScreen::drawSummary() {
@@ -960,6 +971,12 @@ void DragMeterScreen::drawSummary() {
                   SCREEN_HEIGHT - 20);
 
   _ui->drawStatusBar(true);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void DragMeterScreen::drawMenu() {
@@ -994,6 +1011,12 @@ void DragMeterScreen::drawMenu() {
     tft->drawString(_menuItems[i], SCREEN_WIDTH / 2, y + btnHeight / 2 + 2);
   }
   _ui->drawStatusBar(true);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void DragMeterScreen::drawDragModeMenu() {

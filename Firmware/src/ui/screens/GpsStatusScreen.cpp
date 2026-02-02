@@ -321,4 +321,10 @@ void GpsStatusScreen::drawStatus() {
     // Logic for satellites if we had them or just static crosshair
     _lastFixed = true;
   }
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }

@@ -272,5 +272,10 @@ void SpeedometerScreen::drawDashboard(bool force) {
   tft->setTextPadding(60);
   sprintf(buf, "%d", _lastRPM);
   tft->drawString(buf, rpmX + rpmW + 10, rpmY + 6);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
   tft->setTextPadding(0);
 }

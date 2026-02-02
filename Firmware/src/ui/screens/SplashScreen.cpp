@@ -29,6 +29,7 @@ void SplashScreen::onShow() {
 }
 
 void SplashScreen::update() {
+  TFT_eSPI *tft = _ui->getTft();
   int dx = (SCREEN_WIDTH - 320) / 2;
   int dy = (SCREEN_HEIGHT - 240) / 2;
 
@@ -37,7 +38,6 @@ void SplashScreen::update() {
     if (millis() - _lastUpdate > 10) {
       _progress += 2;
 
-      TFT_eSPI *tft = _ui->getTft();
       int barX = (SCREEN_WIDTH - 280) / 2; // Center the bar
       tft->fillRect(barX, 198 + dy, _progress, 8, 0xFFFF);
 
@@ -55,9 +55,23 @@ void SplashScreen::update() {
       if (!setupDone) {
         // First launch - go to setup
         Serial.println("First launch detected, showing setup screen");
+
+        // --- FONT SAFETY ---
+        tft->setTextSize(1);
+        tft->setFreeFont(NULL);
+        tft->setTextFont(1);
+        tft->setTextPadding(0);
+
         _ui->switchScreen(SCREEN_SETUP);
       } else {
         // Normal launch - go to menu
+
+        // --- FONT SAFETY ---
+        tft->setTextSize(1);
+        tft->setFreeFont(NULL);
+        tft->setTextFont(1);
+        tft->setTextPadding(0);
+
         _ui->switchScreen(SCREEN_MENU);
       }
     }

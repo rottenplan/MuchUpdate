@@ -117,6 +117,12 @@ void SetupScreen::drawWelcome() {
 
   // Continue button (larger)
   drawButton("TAP TO BEGIN", SCREEN_WIDTH / 2 - 120, 200, 240, 60, false);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void SetupScreen::drawComplete() {
@@ -142,6 +148,12 @@ void SetupScreen::drawComplete() {
 
   // Continue button (larger and lower)
   drawButton("START RACING", SCREEN_WIDTH / 2 - 100, 210, 200, 50, false);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 // Updated Account Setup (Compact Layout)
@@ -316,6 +328,12 @@ void SetupScreen::drawWiFiSetup(bool fullRedraw) {
     // Nav Buttons (Compact)
     drawButton("BACK", 5, 5, 60, 25, false, 1);
     drawButton("CONN", SCREEN_WIDTH - 65, 5, 60, 25, _wifiSSID.length() > 0, 1);
+
+    // --- FONT SAFETY ---
+    tft->setTextSize(1);
+    tft->setFreeFont(NULL);
+    tft->setTextFont(1);
+    tft->setTextPadding(0);
 
     // Status Indicator (Small)
     tft->setTextDatum(TC_DATUM);

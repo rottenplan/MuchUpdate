@@ -70,8 +70,8 @@ void setup() {
   tft.fillScreen(TFT_BLACK);
   delay(100); // Ensure black frame is rendered
 
-  // Nyalakan Backlight
-  ledcWrite(0, 255);
+  // Nyalakan Backlight (UIManager will handle setting the user's brightness)
+  // ledcWrite(0, 255);
 
   uiManager.setTouch(&touch); // Teruskan objek sentuh ke UI
   uiManager.begin();

@@ -149,9 +149,8 @@ void HistoryScreen::update() {
       int tx = _touchStartX;
       int ty = _touchStartY;
 
-      // 1. Tombol Kembali (Bottom Left area)
-      if (p.x < 100 && p.y > 240) {
-        // Single Tap Logic
+      // 1. Back button (Bottom Left Area - 0-100, 240-320)
+      if (tx < 100 && ty > 240) {
         if (_currentMode == MODE_MENU) {
           _ui->switchScreen(SCREEN_MENU);
           return;
@@ -250,8 +249,8 @@ void HistoryScreen::update() {
           int count = 0;
           int skip = 0;
           int targetIdx = -1;
-          for (int i = 0; i < _historyList.size(); i++) {
-            if (_historyList[i].type != _selectedType) {
+          for (int i = 0; i < (int)_historyList.size(); i++) {
+            if (_historyList[i].type == _selectedType) {
               if (_historyList[i].date.length() >= 10) {
                 String g = _historyList[i].date.substring(6, 10) + "-" +
                            _historyList[i].date.substring(3, 5);
@@ -331,7 +330,7 @@ void HistoryScreen::update() {
             _selectedIdx = idx;
             drawConfirmDelete();
             if (idx == 0) { // YES
-              if (_lastTapIdx >= 0 && _lastTapIdx < _historyList.size()) {
+              if (_lastTapIdx >= 0 && _lastTapIdx < (int)_historyList.size()) {
                 sessionManager.deleteSession(
                     _historyList[_lastTapIdx].filename);
                 scanHistory();
@@ -430,29 +429,34 @@ void HistoryScreen::drawMenu() {
     tft->drawRect(x, y, btnWidth, btnHeight, TFT_DARKGREY);
     tft->drawString(items[i], SCREEN_WIDTH / 2, y + (btnHeight / 2));
   }
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void HistoryScreen::drawGroups(int scrollOffset) {
   TFT_eSPI *tft = _ui->getTft();
 
   // Clear Content Area (Below Header)
-  // Clear Content Area (Below Header)
-  tft->fillRect(0, 40, SCREEN_WIDTH, 170, TFT_BLACK);
+  tft->fillRect(0, 45, SCREEN_WIDTH, SCREEN_HEIGHT - 45 - 40, TFT_BLACK);
 
   // Sub-Header "- SESSIONS -"
   tft->setTextColor(TFT_SILVER, TFT_BLACK);
-  tft->setTextDatum(MC_DATUM);
+  tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(NULL);
   tft->setTextSize(1);
-  tft->drawString("- SESSIONS -", SCREEN_WIDTH / 2, 50);
+  tft->drawString("- SELECT MONTH -", SCREEN_WIDTH / 2, 50);
 
-  int startY = 70;
-  int itemH = 30;
+  int startY = 75;
+  int itemH = 35;
   int count = 0;
   int skip = 0;
 
   for (int i = 0; i < _groups.size(); i++) {
-    if (count >= 7) // Show 7 groups
+    if (count >= 5) // Show 5 groups
       break;
     if (skip < scrollOffset) {
       skip++;
@@ -462,29 +466,47 @@ void HistoryScreen::drawGroups(int scrollOffset) {
     int y = startY + (count * itemH);
     bool selected = (i == _selectedIdx);
 
-    uint16_t bg = selected ? TFT_WHITE : TFT_BLACK;
-    uint16_t fg = selected ? TFT_BLACK : TFT_WHITE;
+    uint16_t bg = selected ? 0x18E3 : TFT_BLACK;
+    uint16_t fg = selected ? TFT_GOLD : TFT_WHITE;
 
-    tft->fillRect(0, y, SCREEN_WIDTH, itemH, bg);
+    if (selected)
+      tft->fillRect(0, y, SCREEN_WIDTH, itemH, bg);
+
     tft->setTextColor(fg, bg);
     tft->setTextDatum(TL_DATUM);
-    tft->setTextFont(2); // Larger blocky font
+    tft->setTextFont(2);
 
-    tft->drawString(_groups[i], 10, y + 8);
+    // Convert YYYY-MM to Month Name
+    String year = _groups[i].substring(0, 4);
+    String month = _groups[i].substring(5, 7);
+    const char *months[] = {"January",   "February", "March",    "April",
+                            "May",       "June",     "July",     "August",
+                            "September", "October",  "November", "December"};
+    int mIdx = month.toInt() - 1;
+    String disp = (mIdx >= 0 && mIdx < 12) ? String(months[mIdx]) + " " + year
+                                           : _groups[i];
+
+    tft->drawString(disp, 20, y + 8);
+    // Arrow icon
+    tft->drawString(">", SCREEN_WIDTH - 30, y + 8);
 
     count++;
   }
 
-  // Clear any remaining space at the bottom to prevent ghosting
-  int nextY = startY + (count * itemH);
-  if (nextY < SCREEN_HEIGHT) {
-    tft->fillRect(0, nextY, SCREEN_WIDTH, SCREEN_HEIGHT - nextY, TFT_BLACK);
-  }
-
   if (_groups.empty()) {
     tft->setTextColor(TFT_WHITE, TFT_BLACK);
-    tft->drawString("No Groups Found", SCREEN_WIDTH / 2, 120);
+    tft->setTextDatum(MC_DATUM);
+    tft->drawString("No Sessions Found", SCREEN_WIDTH / 2, 120);
   }
+
+  // Back Triangle
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, TFT_BLUE);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void HistoryScreen::drawList(int scrollOffset) {
@@ -501,25 +523,20 @@ void HistoryScreen::drawList(int scrollOffset) {
   }
 
   // Clear Content Area
-  tft->fillRect(0, 40, SCREEN_WIDTH, 170, TFT_BLACK);
+  tft->fillRect(0, 45, SCREEN_WIDTH, SCREEN_HEIGHT - 45 - 40, TFT_BLACK);
 
-  // Sub-Header
+  // Column Headers
   tft->setTextColor(TFT_SILVER, TFT_BLACK);
-  tft->setTextDatum(MC_DATUM);
-  tft->setFreeFont(NULL);
-  tft->setTextSize(1);
-  String sub = "Total: " + String(totalInGroup);
-  tft->drawString(sub, SCREEN_WIDTH / 2, 50);
+  tft->setTextFont(1);
+  tft->setTextDatum(TL_DATUM);
+  tft->drawString("ID", 5, 50);
+  tft->drawString("DATE", 45, 50);
+  tft->drawString(_selectedType == "DRAG" ? "RUN" : "TIME", 155, 50);
 
-  int startY = 70; // Lowered to Y=70
-  int itemH = 25;
-
+  int startY = 65;
+  int itemH = 26;
   int count = 0;
   int skip = 0;
-
-  // We need to iterate _historyList to find items in this group
-  // And we need to assign IDs. Let's assume ID = TotalItems - GlobalIndex
-  // (Latest = MaxID) Or just TotalInGroup - IndexInGroup
   int currentGroupIdx = 0;
 
   for (int i = 0; i < _historyList.size(); i++) {
@@ -535,106 +552,61 @@ void HistoryScreen::drawList(int scrollOffset) {
     if (g != _selectedGroup)
       continue;
 
-    // Valid item in group
-    // ID logic: If list is sorted Newest First (index 0), then ID should be
-    // descending? Image 2 shows 023, 022, 021 (Newest at top). So ID =
-    // totalInGroup - currentGroupIdx
     int idVal = totalInGroup - currentGroupIdx;
     currentGroupIdx++;
-
-    // Pagination
-    if (count >= 8) { // Show 8 items
-      continue; // Don't break, need to continue logic if we want total? No we
-                // calculated total.
-                // break;
-    }
 
     if (skip < scrollOffset) {
       skip++;
       continue;
     }
     if (count >= 8)
-      break; // Optimization
-
-    // Draw Item
-    // Format: [ID] [YYYY-MM-DD] [HH:MM:SS]
-    // Parse "DD/MM/YYYY HH:MM:SS" -> "YYYY-MM-DD"
-    // ID: 3 digits %03d
+      break;
 
     int y = startY + (count * itemH);
 
-    // Selection Highlight? Image 2 doesn't show explicit selection bar, but
-    // typical UI does. Assuming we can select rows. But wait, Image 2 has no
-    // Highlight. It's just a list. Wait, Image 1 has highlight. Image 2 must
-    // support selection to Open Options. We'll mimic Image 1 highlight style
-    // (Inverted Colors). But which one is selected? _selectedIdx tracks
-    // relative visible index or group index? In update(), we used visible
-    // index.
+    // Row Background (Slight alternate or highlight)
+    if (count % 2 != 0)
+      tft->fillRect(0, y, SCREEN_WIDTH, itemH, 0x0841); // Very dark gray
 
-    // Wait, in update() logic: _selectedIdx tracks VISIBLE index?
-    // No, scanGroups logic: _selectedIdx is bound to "actualIdx".
-    // drawList logic needs to match update() logic.
-    // In update() for MODE_LIST:
-    // int visIdx = (p.y - listY) / itemH;
-    // We map click to item.
-    // We don't necessarily maintain a persistent highlight unless using
-    // buttons. For touch, usually checking "active" tap. But let's support
-    // highlighting if we use physical buttons later or just for feedback.
-
-    // Let's just draw white on black.
-
-    tft->fillRect(0, y, SCREEN_WIDTH, itemH, TFT_BLACK);
-    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextColor(TFT_WHITE, count % 2 != 0 ? 0x0841 : TFT_BLACK);
     tft->setTextDatum(TL_DATUM);
-    tft->setTextFont(1); // Small font to fit line? Or Font 2?
-    // Font 2 might be too wide for "023 2025-05-18 14:40:45" (24 chars)
-    // 24 * ~10px = 240px. might fit exactly.
 
-    // Parse Date
-    String dRaw = _historyList[i].date.substring(0, 10); // DD/MM/YYYY
-    String tRaw = (_historyList[i].date.length() > 11)
-                      ? _historyList[i].date.substring(11)
-                      : "";
-
-    String yyyy = dRaw.substring(6, 10);
-    String mm = dRaw.substring(3, 5);
-    String dd = dRaw.substring(0, 2);
-    String dDisp = yyyy + "-" + mm + "-" + dd;
-
+    // ID
     char bufID[16];
     sprintf(bufID, "%03d", idVal);
+    tft->drawString(bufID, 5, y + 5, 2);
 
-    // X Positions
-    // ID: 5
-    // Date: 40
-    // Time/Result: 140
-
-    tft->drawString(bufID, 5, y + 4, 2); // Font 2
-    tft->drawString(dDisp, 45, y + 4, 2);
+    // Parse Date to "DD Month" or "DD/MM"
+    String dRaw = _historyList[i].date.substring(0, 5); // DD/MM
+    tft->drawString(dRaw, 45, y + 5, 2);
 
     if (_selectedType == "DRAG") {
-      // Show Result Time (e.g. 4.50s)
       float res = _historyList[i].bestLap / 1000.0;
       String resStr = String(res, 2) + "s";
-      tft->setTextColor(TFT_ORANGE, TFT_BLACK);
-      tft->drawString(resStr, 155, y + 4, 2);
+      tft->setTextColor(TFT_GOLD, count % 2 != 0 ? 0x0841 : TFT_BLACK);
+      tft->drawString(resStr, 155, y + 5, 2);
     } else {
-      // Show Time of Day
-      tft->setTextColor(TFT_WHITE, TFT_BLACK);
-      tft->drawString(tRaw, 155, y + 4, 2);
+      String tRaw = (_historyList[i].date.length() > 11)
+                        ? _historyList[i].date.substring(11, 16)
+                        : "";
+      tft->drawString(tRaw, 155, y + 5, 2);
+
+      // Lap Count (Subtle)
+      tft->setTextColor(TFT_SILVER, count % 2 != 0 ? 0x0841 : TFT_BLACK);
+      tft->drawString("(" + String(_historyList[i].laps) + "L)", 220, y + 5, 2);
     }
 
     count++;
   }
 
-  // Clear any remaining space at the bottom to prevent ghosting
-  int nextY = startY + (count * itemH);
-  if (nextY < SCREEN_HEIGHT) {
-    tft->fillRect(0, nextY, SCREEN_WIDTH, SCREEN_HEIGHT - nextY, TFT_BLACK);
-  }
-
   // Back Triangle
   tft->fillTriangle(10, 290, 25, 282, 25, 298, TFT_BLUE);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void HistoryScreen::scanGroups() {
@@ -1030,8 +1002,8 @@ void HistoryScreen::drawViewData() {
     tft->drawString("No RPM/Temp Logs", SCREEN_WIDTH / 2, 120, 2);
   }
 
-  // Back Triangle
-  tft->fillTriangle(10, 220, 22, 214, 22, 226, TFT_BLUE);
+  // Back Triangle (Standardized Bottom-Left)
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
 }
 
 void HistoryScreen::drawConfirmDelete() {

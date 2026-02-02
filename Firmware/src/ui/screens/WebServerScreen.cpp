@@ -22,70 +22,54 @@ void WebServerScreen::onShow() {
 void WebServerScreen::drawStatic() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Header
-  tft->drawFastHLine(0, 20, 320,
-                     _ui->getSecondaryColor()); // Using 320 const for width
+  // Standardized Back Button (Bottom-Left)
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
+
+  // Instructions (Header)
   tft->setTextDatum(TC_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->drawString("OFFLINE SERVER", 160, 25);
-
-  // Back
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextSize(1);
-  tft->drawString("<", 10, 25);
-
-  // Instructions
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextColor(TFT_SILVER, TFT_BLACK);
-  tft->setTextFont(1);
-  tft->drawString("Connect via Phone/Laptop to:", 160, 60);
+  tft->setTextColor(TFT_SILVER, _ui->getBackgroundColor());
+  tft->setTextFont(2);
+  tft->drawString("Connect via Phone/Laptop to:", SCREEN_WIDTH / 2, 35);
 }
 
 void WebServerScreen::drawStatus() {
   TFT_eSPI *tft = _ui->getTft();
 
-  int boxY = 80;
-  int boxW = 280;
-  int boxH = 120;
-  int boxX = (320 - boxW) / 2;
+  // Card Background (Matching About Device)
+  int cardX = 20;
+  int cardY = 60;
+  int cardW = SCREEN_WIDTH - 40;
+  int cardH = 180;
 
-  tft->fillRoundRect(boxX, boxY, boxW, boxH, 8, 0x18E3); // Charcoal
-  tft->drawRoundRect(boxX, boxY, boxW, boxH, 8, TFT_DARKGREY);
+  tft->fillRoundRect(cardX, cardY, cardW, cardH, 10, 0x18E3); // Charcoal
+  tft->drawRoundRect(cardX, cardY, cardW, cardH, 10, TFT_DARKGREY);
 
-  // Network Info
-  tft->setTextDatum(ML_DATUM);
+  // Content Centered inside Card
+  tft->setTextDatum(TC_DATUM);
 
-  // SSID
-  tft->setTextColor(TFT_SILVER, 0x18E3);
-  tft->drawString("SSID:", boxX + 20, boxY + 30);
-  tft->setTextColor(TFT_GREEN, 0x18E3);
-  tft->setTextFont(2);
-  tft->drawString("MuchRacing-GPS", boxX + 80,
-                  boxY + 30); // Hardcoded in WiFiManager.cpp
-
-  // PASS
-  tft->setTextFont(1);
-  tft->setTextColor(TFT_SILVER, 0x18E3);
-  tft->drawString("PASS:", boxX + 20, boxY + 60);
-  tft->setTextColor(TFT_WHITE, 0x18E3);
-  tft->setTextFont(2);
-  tft->drawString("12345678", boxX + 80, boxY + 60);
-
-  // IP Address (Big)
-  tft->setTextFont(1);
-  tft->setTextColor(TFT_SILVER, 0x18E3);
-  tft->drawString("IP ADDR:", boxX + 20, boxY + 90);
+  // IP Address (Big - Font 4)
   tft->setTextColor(TFT_CYAN, 0x18E3);
   tft->setTextFont(4);
-  tft->drawString("192.168.4.1", boxX + 80, boxY + 90);
+  tft->drawString("192.168.4.1", SCREEN_WIDTH / 2, cardY + 20);
+
+  // SSID
+  tft->setTextFont(2);
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->drawString("SSID:", SCREEN_WIDTH / 2, cardY + 60);
+  tft->setTextColor(TFT_GREEN, 0x18E3);
+  tft->drawString("MuchRacing-GPS", SCREEN_WIDTH / 2, cardY + 80);
+
+  // PASS
+  tft->setTextColor(TFT_SILVER, 0x18E3);
+  tft->drawString("PASS:", SCREEN_WIDTH / 2, cardY + 110);
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->drawString("12345678", SCREEN_WIDTH / 2, cardY + 130);
 
   // Footer Hint
   tft->setTextDatum(MC_DATUM);
-  tft->setTextColor(TFT_DARKGREY, TFT_BLACK);
-  tft->setTextFont(1);
-  tft->drawString("Open IP in Browser to download data", 160, 220);
+  tft->setTextColor(TFT_DARKGREY, _ui->getBackgroundColor());
+  tft->setTextFont(2);
+  tft->drawString("Open IP in Browser to download data", SCREEN_WIDTH / 2, 260);
 
   _ui->drawStatusBar();
 }
@@ -98,15 +82,14 @@ void WebServerScreen::update() {
       return;
     _lastTouchTime = millis();
 
-    // Back Button
-    if (p.x < 60 && p.y < 60) {
+    // Standardized Back Button Touch Area (Bottom-Left)
+    if (p.x < 120 && p.y > 260) {
       _ui->switchScreen(SCREEN_SETTINGS); // Return to Settings
       return;
     }
   }
 
-  // Refresh Status? (Connected clients count is not easily avail in basic
-  // WiFiAP) So static draw is mostly fine. We re-draw Status Bar periodically
+  // Refresh Status periodically
   if (millis() - _lastUpdate > 1000) {
     _ui->drawStatusBar();
     _lastUpdate = millis();

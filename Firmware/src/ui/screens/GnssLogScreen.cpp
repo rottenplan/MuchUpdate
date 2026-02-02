@@ -39,6 +39,12 @@ void GnssLogScreen::onShow() {
   tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
                     SCREEN_HEIGHT - 19, TFT_BLUE);
 
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
+
   // --- 2. CHECKBOXES (Top area) ---
   drawCheckboxes();
 
@@ -247,4 +253,10 @@ void GnssLogScreen::drawLines() {
     tft->drawString(line, innerX, y);
     y += 12; // Improved spacing (13 lines * 12px = 156px < 180px)
   }
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }

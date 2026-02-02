@@ -320,9 +320,6 @@ void SettingsScreen::loadSettings() {
     // TFT Benchmark (Standard)
     _settings.push_back({"TFT BENCHMARK", TYPE_ACTION});
 
-    // Touch Debug (Removed per user request)
-    // _settings.push_back({"TOUCH DEBUG", TYPE_ACTION});
-
     _prefs.end();
   }
 }
@@ -514,23 +511,6 @@ void SettingsScreen::update() {
   if (p.x == -1)
     return;
 
-  // FIX: Handle Top-Left Back Button for SD Test (Premium Layout)
-  if (_currentMode == MODE_SD_TEST && p.x < 60 && p.y < 60) {
-    if (millis() - lastSettingTouch < 200)
-      return;
-    lastSettingTouch = millis();
-
-    // Return to Utility Menu
-    _currentMode = MODE_UTILITY;
-    _ui->setTitle("UTILITY");
-    loadSettings();
-    _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-    _ui->drawStatusBar(true);
-    drawList(0, true);
-    return;
-  }
-
   // 1. Footer Buttons Zone (Standardized Bottom-Bar y > 260)
   if (p.y > 260) {
     if (millis() - lastSettingTouch < 200)
@@ -657,7 +637,7 @@ void SettingsScreen::update() {
       _lastKeyboardTouch = millis();
 
       // Keyboard input
-      KeyboardComponent::KeyResult res = _keyboard.handleTouch(p.x, p.y, 115);
+      KeyboardComponent::KeyResult res = _keyboard.handleTouch(p.x, p.y, 95);
       switch (res.type) {
       case KeyboardComponent::KEY_CHAR: {
         char c = res.value;
@@ -939,9 +919,9 @@ void SettingsScreen::handleTouch(int idx) {
       _currentMode = MODE_GRAPHIC_TEST;
       startGraphicTest();
       return;
-      // } else if (item.name == "TOUCH DEBUG") {
-      //   _ui->switchScreen(SCREEN_TOUCH_DEBUG);
-      //   return;
+    } else if (item.name == "TOUCH DEBUG") {
+      _ui->switchScreen(SCREEN_TOUCH_DEBUG);
+      return;
     } else if (item.name == "SD CARD TEST") {
       _currentMode = MODE_SD_TEST;
       _ui->setTitle("SD CARD TEST");
@@ -1022,23 +1002,15 @@ void SettingsScreen::drawAbout() {
   tft->setTextFont(2);
   tft->drawString("Made by Muchdas", SCREEN_WIDTH / 2, cardY + 140);
 
-  // Footer Hint (Bottom-Left)
-  tft->setTextColor(TFT_DARKGREY, _ui->getBackgroundColor());
-  tft->setTextDatum(BL_DATUM);
-  tft->drawString("< Back", 10, SCREEN_HEIGHT - 10);
+  // Back button triangle (Bottom-Left)
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
 }
 
 void SettingsScreen::drawHeader(String title, uint16_t backColor) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Draw horizontal line at bottom gap (above the arrow area, like status bar
-  // line) tft->drawFastHLine(0, 210, SCREEN_WIDTH, COLOR_SECONDARY);
-
-  // Back Button at bottom-left - Blue filled triangle pointing LEFT
-  // Same size as MenuScreen arrows: 20px wide, 8px tall
-  // Points: left tip at (5, 225), right-top at (25, 221), right-bottom at (25,
-  // 229)
-  tft->fillTriangle(5, 225, 25, 217, 25, 233, COLOR_ACCENT);
+  // Draw standardized back button at bottom-left
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
 }
 
 void SettingsScreen::drawGPSStatus(bool force) {
@@ -1049,11 +1021,8 @@ void SettingsScreen::drawGPSStatus(bool force) {
     _ui->drawStatusBar(true);
 
     // Static Header
-    tft->setTextColor(COLOR_HIGHLIGHT, _ui->getBackgroundColor());
-    tft->setTextDatum(TL_DATUM);
-    tft->setFreeFont(&Org_01);
-    tft->setTextSize(2);
-    tft->drawString("<", 10, 25);
+    // Standardized back button
+    tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
 
     // Static layout elements
     int yStats = 45; // Shifted up from 62 to prevent overlap
@@ -1184,6 +1153,12 @@ void SettingsScreen::drawGPSStatus(bool force) {
   _lastLat = lat;
   _lastLon = lon;
   _lastFixed = fixed;
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void SettingsScreen::drawSDTest() {
@@ -1201,9 +1176,8 @@ void SettingsScreen::drawSDTest() {
   tft->setTextSize(2);
   tft->drawString("SD CARD TEST", SCREEN_WIDTH / 2, 28);
 
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextSize(1);
-  tft->drawString("<", 10, 25);
+  // Standardized back button
+  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
 
   int y = 60;
 
@@ -1227,6 +1201,18 @@ void SettingsScreen::drawSDTest() {
     tft->setTextFont(2);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->drawString("Please Insert Card", SCREEN_WIDTH / 2, 150);
+    tft->setTextColor(TFT_RED, 0x18E3);
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextFont(4);
+    tft->drawString("RaceBox Pro Firmware", SCREEN_WIDTH / 2, 280);
+    tft->setFreeFont(NULL); // Reset to default for version
+    tft->drawString("v2.1.28-ESP32SL", SCREEN_WIDTH / 2, 305);
+
+    // --- FONT SAFETY ---
+    tft->setTextSize(1);
+    tft->setFreeFont(NULL);
+    tft->setTextFont(1);
+    tft->setTextPadding(0);
     return;
   }
 
@@ -1294,6 +1280,7 @@ void SettingsScreen::drawSDTest() {
 
   // Write
   tft->setTextColor(TFT_WHITE, 0x10A2);
+  tft->setTextDatum(TC_DATUM);
   tft->setTextFont(1);
   tft->drawString("WRITE SPEED", midX + cardW / 4, y + 20);
 
@@ -1303,6 +1290,12 @@ void SettingsScreen::drawSDTest() {
                   midX + cardW / 4, y + 40);
 
   tft->drawLine(midX, y + 20, midX, y + speedH - 10, TFT_SILVER);
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void SettingsScreen::drawList(int scrollOffset, bool force) {
@@ -1425,12 +1418,22 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
                         COLOR_ACCENT);
     }
   }
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 // WiFi Functions
 
 void SettingsScreen::drawWiFiList(bool force) {
   TFT_eSPI *tft = _ui->getTft();
+
+  // FIX: Clear screen to prevent ghosting (Double Screen issue)
+  tft->fillScreen(_ui->getBackgroundColor());
+  _ui->drawStatusBar(true);
 
   drawHeader("WIFI SETUP");
 
@@ -1473,22 +1476,35 @@ void SettingsScreen::drawWiFiList(bool force) {
     tft->setTextColor(COLOR_TEXT, COLOR_BG);
     tft->setTextDatum(MC_DATUM);
     tft->drawString("No networks found", SCREEN_WIDTH / 2, 120);
+    tft->fillCircle(SCREEN_WIDTH - 20, 290, 5, TFT_RED);
+    tft->drawString("Scan to Refresh", SCREEN_WIDTH / 2, 290);
   }
+
+  // --- FONT SAFETY ---
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->setTextFont(1);
+  tft->setTextPadding(0);
 }
 
 void SettingsScreen::drawKeyboard(bool fullRedraw) {
   if (fullRedraw) {
-    drawHeader("ENTER PASSWORD");
-    // Show SSID
     TFT_eSPI *tft = _ui->getTft();
+
+    // FIX: Clear screen to prevent ghosting (Double Screen issue)
+    tft->fillScreen(_ui->getBackgroundColor());
+    _ui->drawStatusBar(true);
+
+    drawHeader("ENTER PASSWORD");
+    // Show SSID (shifted up)
     tft->setTextColor(COLOR_TEXT, COLOR_BG);
     tft->setTextDatum(TC_DATUM);
-    tft->drawString(_targetSSID, SCREEN_WIDTH / 2, 60);
+    tft->drawString(_targetSSID, SCREEN_WIDTH / 2, 45);
   }
 
-  // Redraw password field
+  // Redraw password field (shifted up)
   TFT_eSPI *tft = _ui->getTft();
-  tft->fillRect(10, 80, SCREEN_WIDTH - 20, 25, TFT_DARKGREY);
+  tft->fillRect(10, 65, SCREEN_WIDTH - 20, 25, TFT_DARKGREY);
   tft->setTextColor(TFT_WHITE, TFT_DARKGREY);
   tft->setTextDatum(TL_DATUM);
   tft->setTextFont(2);
@@ -1500,13 +1516,13 @@ void SettingsScreen::drawKeyboard(bool fullRedraw) {
     for (int i = 0; i < _enteredPass.length(); i++)
       displayPass += "*";
   }
-  tft->drawString(displayPass, 15, 85);
+  tft->drawString(displayPass, 15, 70);
 
   tft->setTextDatum(TR_DATUM);
   tft->setTextColor(COLOR_HIGHLIGHT, TFT_DARKGREY);
-  tft->drawString(_showPassword ? "HIDE" : "SHOW", SCREEN_WIDTH - 15, 85);
+  tft->drawString(_showPassword ? "HIDE" : "SHOW", SCREEN_WIDTH - 15, 70);
 
-  _keyboard.draw(tft, 115, _isUppercase);
+  _keyboard.draw(tft, 95, _isUppercase);
 }
 
 void SettingsScreen::connectWiFi() {
