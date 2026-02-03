@@ -298,9 +298,7 @@ bool SyncManager::uploadSessions(const char *apiUrl, const char *username,
       if (!f)
         continue;
 
-      String content = "";
-      while (f.available())
-        content += (char)f.read();
+      String content = f.readString(); // Much faster than byte-by-byte
       f.close();
 
       HTTPClient http;
@@ -350,19 +348,10 @@ bool SyncManager::downloadTracks(const char *apiUrl, const char *authHeader) {
   bool success = false;
 
   if (httpCode == HTTP_CODE_OK) {
-    String payload = http.getString();
-    Serial.println("Sync: Tracks received");
-
-    // Save directly to SD card
-    if (SD.exists("/tracks.json")) {
-      SD.remove("/tracks.json");
-    }
-
-    // Requires SD to be initialized (done in GPSManager typically)
-    // Check if SD is ready?
+    // Stream directly to SD card to save RAM
     File file = SD.open("/tracks.json", FILE_WRITE);
     if (file) {
-      file.print(payload);
+      http.writeToStream(&file);
       file.close();
       Serial.println("Sync: Tracks saved to /tracks.json");
       success = true;

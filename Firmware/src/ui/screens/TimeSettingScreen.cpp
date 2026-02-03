@@ -51,8 +51,8 @@ void TimeSettingScreen::update() {
     if (millis() - lastTouch > 200) {
       lastTouch = millis();
 
-      // 1. Back Button (Top Left)
-      if (p.x < 60 && p.y < 60) {
+      // 1. Back Button (Standard Bottom Left Area)
+      if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
         static unsigned long lastBackTap = 0;
         if (millis() - lastBackTap < 500) {
           _ui->switchScreen(SCREEN_SETTINGS);
@@ -149,14 +149,9 @@ void TimeSettingScreen::drawScreen() {
   // or use a smaller range.
   tft->fillRect(0, 61, SCREEN_WIDTH, SCREEN_HEIGHT - 61, COLOR_BG);
 
-  // Header
-  // Back Arrow
-  uint16_t backColor = (_selectedIdx == 0) ? COLOR_HIGHLIGHT : COLOR_TEXT;
-  tft->setTextColor(backColor, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  // Back Button (Blue Triangle)
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
 
   // Title
   tft->setTextColor(COLOR_TEXT, COLOR_BG);
@@ -170,7 +165,7 @@ void TimeSettingScreen::drawScreen() {
   int cY = 160;
   int boxH = 50;
   int arrowGap = 8;
-  int arrowH = 15;
+  int arrowH = 10;
   int boxW = 60;
   int gap = 30;
 
@@ -178,7 +173,7 @@ void TimeSettingScreen::drawScreen() {
   int mCX = (SCREEN_WIDTH / 2) + (boxW / 2) + (gap / 2);
 
   // Arrow Params
-  int arrowW = 15; // Half width
+  int arrowW = 8; // Half width (total 16)
 
   int upYBot = cY - (boxH / 2) - arrowGap;
   int upYTop = upYBot - arrowH;

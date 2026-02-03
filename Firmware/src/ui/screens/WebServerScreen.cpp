@@ -22,8 +22,9 @@ void WebServerScreen::onShow() {
 void WebServerScreen::drawStatic() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Standardized Back Button (Bottom-Left)
-  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
+  // Back Button (Blue Triangle)
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
 
   // Instructions (Header)
   tft->setTextDatum(TC_DATUM);
@@ -83,7 +84,7 @@ void WebServerScreen::update() {
     _lastTouchTime = millis();
 
     // Standardized Back Button Touch Area (Bottom-Left)
-    if (p.x < 120 && p.y > 260) {
+    if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
       _ui->switchScreen(SCREEN_SETTINGS); // Return to Settings
       return;
     }

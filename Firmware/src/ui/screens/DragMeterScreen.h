@@ -112,7 +112,7 @@ private:
 
   // Drawing
   void drawPredictiveMode();
-  void drawDashboardStatic();  // Dib panggil sekali di onShow
+  void drawDashboardStatic(bool forceStatusBar = true); // Simplified routing
   void drawDashboardDynamic(); // Dipanggil di loop update
   void drawResults();          // Summary
 };

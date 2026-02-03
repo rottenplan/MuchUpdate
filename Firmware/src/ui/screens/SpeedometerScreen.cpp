@@ -23,8 +23,11 @@ void SpeedometerScreen::onShow() {
   _maxRPM = 0;
   _lastSats = -1;
 
-  // SETUP RPM SENSOR
-  // MOVED TO GPSManager for global access
+  // Cache Settings
+  Preferences prefs;
+  prefs.begin("laptimer", true);
+  _lastUnits = prefs.getInt("units", 0) == 1; // 0=km/h, 1=mph
+  prefs.end();
 
   drawDashboard(true);
 }
@@ -66,11 +69,8 @@ void SpeedometerScreen::update() {
   int gear = 0;
   int bat = 100;
 
-  // Cek satuan (km/h atau mph)
-  Preferences prefs;
-  prefs.begin("laptimer", true);
-  bool useMph = prefs.getInt("units", 0) == 1; // 0=km/h, 1=mph
-  prefs.end();
+  // Cek satuan (km/h atau mph) dari cache
+  bool useMph = _lastUnits;
 
   if (useMph) {
     speed *= 0.621371;

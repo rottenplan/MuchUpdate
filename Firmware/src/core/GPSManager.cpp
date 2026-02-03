@@ -143,30 +143,31 @@ void GPSManager::update() {
 
     // Manual parsing of NMEA sentences for satellites in view
     if (c == '\n') {
+      _nmeaBuffer[_nmeaPos] = '\0'; // Null terminate
       // Check if this is a GSV sentence: $GPGSV or $GNGSV
-      if (_nmeaBuffer.length() > 6 && _nmeaBuffer.startsWith("$G") &&
-          _nmeaBuffer.indexOf("GSV") == 3) {
-        // GPGSV/GNGSV format: $GPGSV,numMsgs,msgNum,totalS ats,...
-        // Field 3 is total satellites in view
-        int firstComma = _nmeaBuffer.indexOf(',');
-        if (firstComma > 0) {
-          int secondComma = _nmeaBuffer.indexOf(',', firstComma + 1);
-          if (secondComma > 0) {
-            int thirdComma = _nmeaBuffer.indexOf(',', secondComma + 1);
-            if (thirdComma > 0) {
-              String satCountStr =
-                  _nmeaBuffer.substring(secondComma + 1, thirdComma);
-              _satsInView = satCountStr.toInt();
-            }
+      if (_nmeaPos > 6 && _nmeaBuffer[0] == '$' && _nmeaBuffer[1] == 'G' &&
+          _nmeaBuffer[3] == 'G' && _nmeaBuffer[4] == 'S' &&
+          _nmeaBuffer[5] == 'V') {
+        // GPGSV/GNGSV format: $GPGSV,numMsgs,msgNum,totalSats,...
+        // Find 3rd comma
+        int commaCount = 0;
+        char *ptr = _nmeaBuffer;
+        while (*ptr && commaCount < 3) {
+          if (*ptr == ',')
+            commaCount++;
+          ptr++;
+          if (commaCount == 3) {
+            _satsInView = atoi(ptr);
+            break;
           }
         }
       }
-      _nmeaBuffer = "";
+      _nmeaPos = 0;
     } else if (c != '\r') {
-      _nmeaBuffer += (char)c;
-      // Limit buffer size to prevent memory issues
-      if (_nmeaBuffer.length() > 100) {
-        _nmeaBuffer = "";
+      if (_nmeaPos < sizeof(_nmeaBuffer) - 1) {
+        _nmeaBuffer[_nmeaPos++] = (char)c;
+      } else {
+        _nmeaPos = 0; // Buffer overflow, reset
       }
     }
   }
@@ -964,6 +965,47 @@ void GPSManager::disableUnnecessarySentences() {
 // UBX Binary Protocol Parser Implementation
 // This file contains the UBX parser methods for GPSManager
 // Append this to the end of GPSManager.cpp
+
+void GPSManager::resetModule() {
+  Serial.println("GPS: Sending Reset Command (Cold Start)...");
+
+  // UBX-CFG-RST (0x06 0x04)
+  // Payload:
+  // navBbrMask (2 bytes): 0xFFFF = Cold Start (clear all)
+  // resetMode (1 byte): 0x01 = Hardware Reset (watchdog), 0x02 = Controlled
+  // Software Reset reserved1 (1 byte): 0x00
+  uint8_t resetCmd[] = {
+      0xB5, 0x62, // Header
+      0x06, 0x04, // Class/ID
+      0x04, 0x00, // Length (4 bytes)
+      0xFF, 0xFF, // BBR Mask (Cold Start)
+      0x01,       // Reset Mode (Hardware Reset)
+      0x00,       // Reserved
+      0x00, 0x00  // Checksum
+  };
+
+  // Calc Checksum
+  uint8_t ck_a = 0, ck_b = 0;
+  for (int i = 2; i < 10; i++) {
+    ck_a += resetCmd[i];
+    ck_b += ck_a;
+  }
+  resetCmd[10] = ck_a;
+  resetCmd[11] = ck_b;
+
+  _gpsSerial->write(resetCmd, 12);
+  _gpsSerial->flush();
+
+  // Reset internal state
+  _hasValidFix = false;
+  _satelliteCount = 0;
+  _satsInView = 0;
+  _hdop = 99.9;
+
+  // Re-init some configs after a short delay
+  delay(500);
+  begin();
+}
 
 void GPSManager::processUBXByte(uint8_t b) {
   switch (_ubxState) {

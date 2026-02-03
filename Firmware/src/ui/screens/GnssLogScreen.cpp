@@ -144,7 +144,7 @@ void GnssLogScreen::update() {
   // Touch Handling
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1) {
-    if (p.y > 200 && p.x < 60) {
+    if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
       // Back (Triangle area)
       static unsigned long lastBackTap = 0;
       if (millis() - lastBackTap < 500) {

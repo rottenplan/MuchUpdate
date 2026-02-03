@@ -79,9 +79,9 @@ void RpmSensorScreen::onHide() {
 }
 
 void RpmSensorScreen::update() {
-  // 1. Back Button
+  // 1. Back Button (Standard Bottom Left Area)
   UIManager::TouchPoint p = _ui->getTouchPoint();
-  if (p.x != -1 && p.x < 60 && p.y < 60) {
+  if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
     _ui->switchScreen(SCREEN_MENU); // Instant Switch (Single Tap)
     return;
   }
@@ -141,9 +141,9 @@ void RpmSensorScreen::drawScreen() {
                     headerY + 28);
   }
 
-  // Back Button (Blue Triangle) - Top Left (Standardized)
-  // Triangle pointing Left: (10, 35), (22, 29), (22, 41)
-  tft->fillTriangle(10, 35, 22, 29, 22, 41, TFT_BLUE);
+  // Back Button (Blue Triangle) - Bottom Left
+  // Centered vertically with progress bar (bar y=294, h=14, center=301)
+  tft->fillTriangle(10, 301 - 6, 22, 301 - 12, 22, 301, TFT_BLUE);
 
   // --- INFO CARDS ---
   int cardY = 55;
@@ -167,7 +167,11 @@ void RpmSensorScreen::drawScreen() {
 
   // --- BOTTOM BAR ---
   // Background container at the very bottom
-  tft->fillRoundRect(10, 292, SCREEN_WIDTH - 20, 18, 4, 0x18E3);
+  // Shifted right (x=40) to avoid Back Button (x=10-22)
+  tft->fillRoundRect(40, 292, SCREEN_WIDTH - 50, 18, 4, 0x18E3);
+
+  // Initial draw of graph (grid)
+  drawGraphLine();
 }
 
 void RpmSensorScreen::updateValues() {
@@ -201,7 +205,8 @@ void RpmSensorScreen::updateValues() {
   tft->setTextPadding(0); // Reset padding
 
   // Update Bottom Bar
-  int barMaxWidth = SCREEN_WIDTH - 24;
+  int barStartX = 42; // Avoid back button
+  int barMaxWidth = SCREEN_WIDTH - barStartX - 10;
   int barW = map(_currentLvl, 0, 100, 0, barMaxWidth);
   if (barW < 0)
     barW = 0;
@@ -210,7 +215,7 @@ void RpmSensorScreen::updateValues() {
 
   int barY = 294;
   int barH = 14;
-  int barX = 12;
+  int barX = barStartX;
 
   // Draw Bar (Fill Green for active, Charcoal for empty)
   if (barW > 0)

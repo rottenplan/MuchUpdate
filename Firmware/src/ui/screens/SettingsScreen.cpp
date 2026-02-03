@@ -309,6 +309,8 @@ void SettingsScreen::loadSettings() {
     }
     _settings.push_back(baud);
 
+    _settings.push_back({"RESET GPS", TYPE_ACTION});
+
     _settings.push_back({"GPS DEBUG", TYPE_ACTION});
 
     _prefs.end();
@@ -847,6 +849,28 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "ABOUT DEVICE") {
       _currentMode = MODE_ABOUT;
       drawAbout();
+    } else if (item.name == "RESET GPS") {
+      // Visual feedback
+      TFT_eSPI *tft = _ui->getTft();
+      tft->fillRect(0, 100, SCREEN_WIDTH, 60, COLOR_BG);
+      tft->setTextColor(TFT_YELLOW, COLOR_BG);
+      tft->setTextDatum(MC_DATUM);
+      tft->setFreeFont(&Org_01);
+      tft->setTextSize(1);
+      tft->drawString("GPS RESETTING...", SCREEN_WIDTH / 2, 120);
+      tft->drawString("Cold Start Initiated", SCREEN_WIDTH / 2, 140);
+
+      extern GPSManager gpsManager;
+      gpsManager.resetModule();
+
+      delay(1000);
+      tft->fillRect(0, 100, SCREEN_WIDTH, 60, COLOR_BG);
+      tft->setTextColor(TFT_GREEN, COLOR_BG);
+      tft->drawString("GPS RESET DONE!", SCREEN_WIDTH / 2, 130);
+      delay(800);
+
+      loadSettings();
+      drawList(_scrollOffset, true);
     } else if (item.name == "WIFI SETUP") {
       // Start WiFi scan
       _currentMode = MODE_WIFI;
@@ -1095,15 +1119,17 @@ void SettingsScreen::drawAbout() {
   tft->setTextFont(2);
   tft->drawString("Made by Muchdas", SCREEN_WIDTH / 2, cardY + 140);
 
-  // Back button triangle (Bottom-Left)
-  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
+  // Back Button (Blue Triangle)
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
 }
 
 void SettingsScreen::drawHeader(String title, uint16_t backColor) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Draw standardized back button at bottom-left
-  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
+  // Back Button (Blue Triangle)
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
 }
 
 void SettingsScreen::drawGPSStatus(bool force) {
@@ -1114,8 +1140,9 @@ void SettingsScreen::drawGPSStatus(bool force) {
     _ui->drawStatusBar(true);
 
     // Static Header
-    // Standardized back button
-    tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
+    // Back Button (Blue Triangle)
+    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                      SCREEN_HEIGHT - 19, TFT_BLUE);
 
     // Static layout elements
     int yStats = 45; // Shifted up from 62 to prevent overlap
@@ -1269,8 +1296,9 @@ void SettingsScreen::drawSDTest() {
   tft->setTextSize(2);
   tft->drawString("SD CARD TEST", SCREEN_WIDTH / 2, 28);
 
-  // Standardized back button
-  tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
+  // Back Button (Blue Triangle)
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
 
   int y = 60;
 
@@ -1494,20 +1522,21 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
     tft->fillRect(0, maxY, SCREEN_WIDTH, SCREEN_HEIGHT - maxY,
                   _ui->getBackgroundColor());
 
-    // Back Arrow (Standardized Bottom-Left)
-    tft->fillTriangle(10, 290, 25, 282, 25, 298, COLOR_ACCENT);
+    // Back Button (Blue Triangle)
+    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                      SCREEN_HEIGHT - 19, TFT_BLUE);
 
-    // Scroll Buttons (Right Edge)
+    // Scroll Buttons (Right Edge) - 16x10 standard
     int scrollX = SCREEN_WIDTH - 100;
     // Up Arrow
     if (scrollOffset > 0) {
-      tft->fillTriangle(scrollX, 305, scrollX + 30, 305, scrollX + 15, 275,
+      tft->fillTriangle(scrollX, 295, scrollX + 16, 295, scrollX + 8, 285,
                         COLOR_ACCENT);
     }
 
     // Down Arrow
     if (scrollOffset + visibleItems < _settings.size()) {
-      tft->fillTriangle(scrollX + 50, 275, scrollX + 80, 275, scrollX + 65, 305,
+      tft->fillTriangle(scrollX + 50, 285, scrollX + 66, 285, scrollX + 58, 295,
                         COLOR_ACCENT);
     }
   }

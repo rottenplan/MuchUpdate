@@ -129,7 +129,7 @@ void GpsDebugScreen::update() {
   // Handle Touch
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1) {
-    if (p.x < 60 && p.y > SCREEN_HEIGHT - 60) {
+    if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
       _ui->switchScreen(SCREEN_SETTINGS);
       return;
     }

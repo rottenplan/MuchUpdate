@@ -42,10 +42,9 @@ void DragMeterScreen::onShow() {
 
   TFT_eSPI *tft = _ui->getTft();
   // Clear only content area
-  _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                            SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+  tft->fillScreen(COLOR_BG);
   _ui->setTitle("DRAG METER");
-  drawDashboardStatic();
+  drawDashboardStatic(true);
 
   // Reset Run State
   _runState = RUN_WAITING;
@@ -89,8 +88,8 @@ void DragMeterScreen::update() {
     if (millis() - lastDragTouch > 200) {
       lastDragTouch = millis();
 
-      // 1. Tombol Kembali (Top Left)
-      if (p.x < 60 && p.y < 60) {
+      // 1. Tombol Kembali (Bottom Left)
+      if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
         static unsigned long lastBackTap = 0;
         if (millis() - lastBackTap < 500) {
           lastBackTap = 0;
@@ -98,28 +97,24 @@ void DragMeterScreen::update() {
             _ui->switchScreen(SCREEN_MENU);
           } else if (_state == STATE_DRAG_MODE_MENU) {
             _state = STATE_MENU;
-            _ui->setTitle("DRAG METER");
             _selectedDragModeIdx = -1; // Reset selection
-            _ui->getTft()->fillScreen(
-                _ui->getBackgroundColor()); // Clear entire screen
-            drawMenu();
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawDashboardStatic(true);
           } else if (_state == STATE_PREDICTIVE_MENU) {
             _state = STATE_MENU;
-            _ui->setTitle("DRAG METER");
             _selectedPredictiveIdx = -1;
-            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-            drawMenu();
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawDashboardStatic(true);
           } else if (_state == STATE_SUMMARY_VIEW) {
             _state = STATE_MENU;
-            _ui->setTitle("DRAG METER");
-            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-            drawMenu();
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawDashboardStatic(true);
           } else {
             // If in running mode, go back to menu
             _state = STATE_MENU;
             _ui->setTitle("DRAG METER");
-            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-            drawDashboardStatic();
+            _ui->getTft()->fillScreen(COLOR_BG);
+            drawDashboardStatic(true);
           }
         } else {
           lastBackTap = millis();
@@ -160,7 +155,7 @@ void DragMeterScreen::update() {
 
               if (_selectedMenuIdx != touchedIdx) {
                 _selectedMenuIdx = touchedIdx;
-                drawMenu();
+                drawDashboardStatic(false); // Only update highlights
               }
             }
           }
@@ -196,7 +191,7 @@ void DragMeterScreen::update() {
 
               if (_selectedDragModeIdx != touchedIdx) {
                 _selectedDragModeIdx = touchedIdx;
-                drawDragModeMenu();
+                drawDashboardStatic(false); // Only update highlights
               }
             }
           }
@@ -213,8 +208,8 @@ void DragMeterScreen::update() {
       // Toggle Area (Header center/right)
       if (p.y < 50 && p.x > 100) {
         _summaryShowBest = !_summaryShowBest;
-        _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-        drawSummary();
+        _ui->getTft()->fillScreen(COLOR_BG);
+        drawDashboardStatic(true);
       }
     }
   }
@@ -248,7 +243,7 @@ void DragMeterScreen::update() {
 
         if (_selectedPredictiveIdx != touchedIdx) {
           _selectedPredictiveIdx = touchedIdx;
-          drawPredictiveMenu();
+          drawDashboardStatic(false); // Only update highlights
         }
       }
     }
@@ -257,32 +252,6 @@ void DragMeterScreen::update() {
   if (_state == STATE_RUNNING) {
     if (_runState == RUN_WAITING) {
       checkStartCondition();
-
-      // Mode Toggle Logic
-      // Up Arrow (Predicted -> Normal) - Y approx 150
-      if (_displayMode == DISPLAY_PREDICTIVE) {
-        if (p.x > SCREEN_WIDTH / 2 - 40 && p.x < SCREEN_WIDTH / 2 + 40 &&
-            p.y > 110 && p.y < 190) {
-          if (millis() - lastDragTouch > 300) {
-            lastDragTouch = millis();
-            _displayMode = DISPLAY_NORMAL;
-            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-            drawDashboardStatic();
-          }
-        }
-      }
-      // Down Arrow (Normal -> Predictive) - Y approx 260
-      else if (_displayMode == DISPLAY_NORMAL) {
-        if (p.x > SCREEN_WIDTH / 2 - 40 && p.x < SCREEN_WIDTH / 2 + 40 &&
-            p.y > 220 && p.y < 300) {
-          if (millis() - lastDragTouch > 300) {
-            lastDragTouch = millis();
-            _displayMode = DISPLAY_PREDICTIVE; // Or cycle through modes
-            _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-            drawDashboardStatic();
-          }
-        }
-      }
 
       // Check for Tree Button (Bottom Right)
       if (p.x != -1 && p.x > SCREEN_WIDTH - 60 && p.y > SCREEN_HEIGHT - 60) {
@@ -299,7 +268,7 @@ void DragMeterScreen::update() {
         _runState = RUN_RUNNING;
         _runStartTime = millis();                             // Start timer
         _ui->getTft()->fillScreen(_ui->getBackgroundColor()); // Clear tree
-        drawDashboardStatic();
+        drawDashboardStatic(true);
       } else {
         drawChristmasTreeOverlay();
       }
@@ -388,7 +357,9 @@ void DragMeterScreen::drawPredictiveMode() {
     timeStr = "--.--";
   }
   // Centered vertically approx
+  tft->setTextPadding(400); // Wide padding for massive clock
   tft->drawString(timeStr, SCREEN_WIDTH / 2, 130);
+  tft->setTextPadding(0);
 
   // Delta to Target
   tft->setTextFont(4); // Medium Font
@@ -402,8 +373,10 @@ void DragMeterScreen::drawPredictiveMode() {
       color = TFT_RED;
 
     tft->setTextColor(color, _ui->getBackgroundColor());
+    tft->setTextPadding(300); // Clear area for target info
     String deltaStr = "Target: " + String(_targetTime, 1) + "s";
     tft->drawString(deltaStr, SCREEN_WIDTH / 2, 230);
+    tft->setTextPadding(0);
   }
 }
 
@@ -622,23 +595,23 @@ void DragMeterScreen::handleMenuTouch(int idx) {
     _state = STATE_RUNNING;
     _ui->setTitle("DRAG METER");
     _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-    drawDashboardStatic();
+    drawDashboardStatic(true);
   } else if (item == "DRAG MODE") {
     _state = STATE_DRAG_MODE_MENU;
     _ui->setTitle("DRAG MODE");
     _selectedDragModeIdx = -1;
-    _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-    drawDragModeMenu();
+    _ui->getTft()->fillScreen(COLOR_BG);
+    drawDashboardStatic(true);
   } else if (item == "PREDICTIVE") {
     _state = STATE_PREDICTIVE_MENU;
     _ui->setTitle("PREDICTIVE");
-    _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-    drawPredictiveMenu();
+    _ui->getTft()->fillScreen(COLOR_BG);
+    drawDashboardStatic(true);
   } else if (item == "SUMMARY") {
     _state = STATE_SUMMARY_VIEW;
     _ui->setTitle("RUN SUMMARY");
-    _ui->getTft()->fillScreen(_ui->getBackgroundColor()); // Clear for summary
-    drawSummary();
+    _ui->getTft()->fillScreen(COLOR_BG); // Clear for summary
+    drawDashboardStatic(true);
   }
 }
 
@@ -651,7 +624,7 @@ void DragMeterScreen::handleDragModeTouch(int idx) {
     _state = STATE_RUNNING;
     _ui->setTitle("DRAG METER");
     _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-    drawDashboardStatic();
+    drawDashboardStatic(true);
   }
 }
 
@@ -700,15 +673,11 @@ void DragMeterScreen::loadDisciplines(int modeIdx) {
   _sessionBest.clear();
 }
 
-void DragMeterScreen::drawDashboardStatic() {
+void DragMeterScreen::drawDashboardStatic(bool forceStatusBar) {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Common Header (Back Arrow)
-  tft->setTextColor(COLOR_HIGHLIGHT, _ui->getBackgroundColor());
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
+  // 1. Solid Background (Removed fillScreen to match LapTimer - handled by
+  // switch)
 
   if (_state == STATE_MENU) {
     _ui->setTitle("DRAG METER");
@@ -724,56 +693,60 @@ void DragMeterScreen::drawDashboardStatic() {
     drawSummary();
   } else {
     _ui->setTitle("DRAG METER");
-    // Draw Running View (Back arrow already drawn)
-    tft->drawFastHLine(0, 45, SCREEN_WIDTH, _ui->getTextColor());
 
-    // Speed Area
-    // "KPH" Label
-    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-    tft->setTextDatum(TR_DATUM); // Top Right
+    // --- TOP CARD (SPEED AREA) ---
+    int speedCardY = 30;
+    int speedCardH = 90;
+    tft->fillRoundRect(10, speedCardY, SCREEN_WIDTH - 20, speedCardH, 8,
+                       0x18E3);
+    tft->drawRoundRect(10, speedCardY, SCREEN_WIDTH - 20, speedCardH, 8,
+                       TFT_DARKGREY);
+
+    // "KPH" Label inside Top Card
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    tft->setTextDatum(TR_DATUM);
     tft->setFreeFont(&Org_01);
-    tft->setTextSize(2);
-    tft->drawString("KPH", SCREEN_WIDTH - 10, 70);
-
-    // Horizontal Line below Speed
-    tft->drawFastHLine(0, 130, SCREEN_WIDTH, _ui->getTextColor());
-
-    // Draw Mode Toggle Arrows
-    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-    tft->setTextDatum(TC_DATUM);
     tft->setTextSize(1);
-    if (_displayMode == DISPLAY_NORMAL) {
-      tft->drawString("v", SCREEN_WIDTH / 2, 260);
-    } else {
-      tft->drawString("^", SCREEN_WIDTH / 2, 150);
-    }
+    tft->drawString("KPH", SCREEN_WIDTH - 25, speedCardY + 10);
 
-    // Vertical Line splitting List and Highlight
-    tft->drawFastVLine(SCREEN_WIDTH / 2, 130, SCREEN_HEIGHT - 130 - 30,
-                       _ui->getTextColor()); // -30 for footer
+    // --- BOTTOM AREA (Two Cards) ---
+    int bottomY = 130;
+    int bottomH = SCREEN_HEIGHT - bottomY - 35; // footer margin
+    int splitX = SCREEN_WIDTH / 2;
 
-    // List Area (Left)
+    // List Card (Left)
+    tft->fillRoundRect(10, bottomY, splitX - 15, bottomH, 8, 0x18E3);
+    tft->drawRoundRect(10, bottomY, splitX - 15, bottomH, 8, TFT_DARKGREY);
+
+    // Highlight/Predictive Card (Right)
+    tft->fillRoundRect(splitX + 5, bottomY, splitX - 15, bottomH, 8, 0x18E3);
+    tft->drawRoundRect(splitX + 5, bottomY, splitX - 15, bottomH, 8,
+                       TFT_DARKGREY);
+
+    // List Headers (Left Side)
     tft->setTextDatum(TL_DATUM);
-    tft->setTextSize(2);
-    int listStartY = 140;
-    int gap = 35;
+    tft->setTextSize(1);
+    tft->setTextColor(TFT_SILVER, 0x18E3);
+    int listStartY = bottomY + 10;
+    int gap = 30;
     for (int i = 0; i < _disciplines.size(); i++) {
-      tft->drawString(_disciplines[i].name, 10, listStartY + (i * gap));
+      tft->drawString(_disciplines[i].name, 20, listStartY + (i * gap));
     }
-
-    // Highlight Box (Right) - Background White
-    tft->fillRect(SCREEN_WIDTH / 2 + 1, 131, SCREEN_WIDTH / 2 - 1,
-                  SCREEN_HEIGHT - 130 - 31, _ui->getTextColor());
 
     // Footer Area (Slope)
-    tft->fillRect(0, SCREEN_HEIGHT - 30, SCREEN_WIDTH, 30,
-                  _ui->getBackgroundColor()); // Clear footer
-    tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
+    tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
     tft->setTextDatum(TL_DATUM);
-    tft->setTextSize(1); // Smaller font for footer
-    tft->drawString("SL:", 10, SCREEN_HEIGHT - 25);
+    tft->setFreeFont(&Org_01);
+    tft->setTextSize(1);
+    tft->drawString("SL:", 40,
+                    SCREEN_HEIGHT - 25); // Shifted for back button clearance
   }
-  _ui->drawStatusBar(true);
+
+  // Back Button (Blue Triangle) - Draw LAST
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
+
+  _ui->drawStatusBar(forceStatusBar);
 }
 
 void DragMeterScreen::drawDashboardDynamic() {
@@ -788,52 +761,58 @@ void DragMeterScreen::drawDashboardDynamic() {
   }
 
   // NORMAL MODE DRAWING
-  // 1. Update Speed
-  // Big Font
-  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
+  // 1. Update Speed (Top Card)
+  tft->setTextColor(TFT_WHITE, 0x18E3);
   tft->setTextDatum(TC_DATUM);
-  tft->setTextFont(7); // Big 7-segment like font
-  tft->setTextSize(1); // Standard size for font 7
-  // We need to verify if Font 7 is available or usage. Org_01 is tiny.
-  // Use FreeFont if needed or standard font numbers.
-  // Assuming Font 6 (large numeric) is available in TFT_eSPI default.
-  tft->drawString(String(_currentSpeed, 1), SCREEN_WIDTH / 2 - 20, 50);
+  tft->setTextFont(7);
+  tft->setTextSize(1);
+  tft->setTextPadding(240); // Standardize area for speed digits
+  tft->drawString(String(_currentSpeed, 1), SCREEN_WIDTH / 2,
+                  45); // Centered (offset removed)
+  tft->setTextPadding(0);
 
-  // 2. Update List Values (Left)
-  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-  tft->setTextDatum(TR_DATUM); // Align Right for values
-  tft->setFreeFont(&Org_01);   // Back to Org_01
+  // 2. Update List Values (Bottom Left Card)
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->setTextDatum(TR_DATUM);
+  tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  int listStartY = 140;
-  int gap = 35;
+  int bottomY = 130;
+  int listStartY = bottomY + 10;
+  int gap = 30;
   for (int i = 0; i < _disciplines.size(); i++) {
     String valText = "--.--";
     if (_disciplines[i].completed) {
       valText = String(_disciplines[i].resultTime / 1000.0, 2);
     }
-    // Draw value at fixed X (half width - padding)
-    tft->drawString(valText, (SCREEN_WIDTH / 2) - 10, listStartY + (i * gap));
+    // Align with names in static draw
+    tft->setTextPadding(100);
+    tft->drawString(valText, (SCREEN_WIDTH / 2) - 25, listStartY + (i * gap));
+    tft->setTextPadding(0);
   }
 
-  // 3. Highlight Box (Right) - White BG, Black Text
-  tft->setTextColor(_ui->getBackgroundColor(), _ui->getTextColor());
+  // 3. Highlight Card (Bottom Right Card)
+  tft->setTextColor(TFT_CYAN, 0x18E3);
 
   // Title (e.g., "400 m")
   tft->setTextDatum(TC_DATUM);
-  tft->setTextSize(2); // Smaller for title
-  tft->drawString(_highlightTitle, (SCREEN_WIDTH * 3) / 4, 145);
+  tft->setTextSize(2);
+  tft->drawString(_highlightTitle, (SCREEN_WIDTH * 3) / 4 - 5, bottomY + 15);
 
   // Value (e.g., "11.37")
-  tft->setTextFont(6); // Large numeric
+  tft->setTextFont(6);
   tft->setTextSize(1);
-  tft->drawString(_highlightValue, (SCREEN_WIDTH * 3) / 4, 190);
+  tft->setTextPadding(140);
+  tft->drawString(_highlightValue, (SCREEN_WIDTH * 3) / 4 - 5, bottomY + 50);
+  tft->setTextPadding(0);
 
   // 4. Slope (Footer)
-  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
-  tft->setFreeFont(&Org_01); // Back to Org_01
+  tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
+  tft->setFreeFont(&Org_01);
   tft->setTextSize(1);
   tft->setTextDatum(TL_DATUM);
-  tft->drawString(String(_slope, 1) + "%", 40, SCREEN_HEIGHT - 25);
+  tft->setTextPadding(80);
+  tft->drawString(String(_slope, 1) + "%", 70, SCREEN_HEIGHT - 25);
+  tft->setTextPadding(0);
 
   // --- FONT SAFETY ---
   tft->setTextSize(1);
@@ -845,132 +824,104 @@ void DragMeterScreen::drawDashboardDynamic() {
 void DragMeterScreen::drawSummary() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Header
-  tft->setTextColor(_ui->getTextColor(), _ui->getBackgroundColor());
+  // Removed fillScreen - handled by transition
+
+  // Header Title
+  tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
   String header = _summaryShowBest ? "SESSION BEST" : "LAST RUN";
-  tft->drawString(header, SCREEN_WIDTH / 2, 25);
+  tft->drawString(header, SCREEN_WIDTH / 2, 28);
 
-  // Toggle Arrows
+  // Toggle Arrows (Subtle)
   tft->setTextSize(1);
+  tft->setTextColor(TFT_SILVER, _ui->getBackgroundColor());
   if (_summaryShowBest) {
-    tft->drawString("v", SCREEN_WIDTH / 2 + 80, 25); // Down to go to Last
+    tft->drawString("v", SCREEN_WIDTH / 2 + 85, 28);
   } else {
-    tft->drawString("^", SCREEN_WIDTH / 2 + 80, 25); // Up to go to Best
+    tft->drawString("^", SCREEN_WIDTH / 2 + 85, 28);
   }
 
-  // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextSize(2); // Org_01 size 2
-  tft->drawString("<", 10, 25);
+  // --- TOP STAT CARD ---
+  int topStatY = 55;
+  int topStatH = 40;
+  tft->fillRoundRect(10, topStatY, SCREEN_WIDTH - 20, topStatH, 6, 0x18E3);
+  tft->drawRoundRect(10, topStatY, SCREEN_WIDTH - 20, topStatH, 6,
+                     TFT_DARKGREY);
 
-  tft->drawFastHLine(0, 45, SCREEN_WIDTH, TFT_WHITE);
-
-  // Peak Speed (Top Right)
-  // Find peak speed of longest discipline or just max speed seen?
-  // We captured peakSpeed in each discipline. Let's show the peak of the
-  // last/longest one.
   float peak = 0;
   const std::vector<Discipline> *data =
       _summaryShowBest ? &_sessionBest : &_disciplines;
-
   if (!data->empty()) {
     peak = data->back().peakSpeed;
   }
 
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
-  tft->setTextDatum(TR_DATUM);
-  tft->setTextFont(4); // Medium numeric
-  tft->setTextSize(1);
-  tft->drawString(String(peak, 1), SCREEN_WIDTH - 40, 50);
-
+  tft->setTextColor(TFT_CYAN, 0x18E3);
+  tft->setTextDatum(ML_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(1);
-  tft->drawString("PK KPH", SCREEN_WIDTH - 5, 65);
+  tft->drawString("PEAK SPEED:", 20, topStatY + topStatH / 2);
 
-  tft->drawFastHLine(0, 85, SCREEN_WIDTH, TFT_WHITE);
+  tft->setTextDatum(MR_DATUM);
+  tft->setTextFont(4);
+  tft->drawString(String(peak, 1) + " KPH", SCREEN_WIDTH - 20,
+                  topStatY + topStatH / 2);
 
-  // Table Headers
-  int y = 90;
-  tft->setTextColor(TFT_LIGHTGREY, COLOR_BG); // Grey headers
+  // --- TABLE AREA ---
+  int tableY = 105;
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(1);
+  tft->setTextColor(TFT_SILVER, _ui->getBackgroundColor());
   tft->setTextDatum(TL_DATUM);
-  tft->drawString("DISC.", 10, y);
+  tft->drawString("DISC.", 20, tableY);
   tft->setTextDatum(TC_DATUM);
-  tft->drawString("TIME", 180, y);
+  tft->drawString("TIME", 210, tableY); // Adjusted column
   tft->setTextDatum(TR_DATUM);
-  tft->drawString("@KPH", 340, y);
-  tft->drawString("SL%", 450, y);
+  tft->drawString("@KPH", 350, tableY); // Adjusted column
+  tft->drawString("SL%", 460, tableY);  // Adjusted column
 
-  tft->drawFastHLine(0, 105, SCREEN_WIDTH, TFT_LIGHTGREY);
+  tft->drawFastHLine(0, tableY + 15, SCREEN_WIDTH, 0x18E3);
 
-  // Rows
-  int startY = 110;
-  int gap = 35; // compact
+  int startY = tableY + 22;
+  int gap = 30;
 
   if (data->empty()) {
-    tft->setTextColor(TFT_WHITE, COLOR_BG);
+    tft->setTextColor(TFT_DARKGREY, _ui->getBackgroundColor());
     tft->setTextDatum(TC_DATUM);
-    tft->drawString("NO DATA", SCREEN_WIDTH / 2, 150);
-    return;
+    tft->drawString("NO DATA AVAILABLE", SCREEN_WIDTH / 2, 180);
+  } else {
+    for (int i = 0; i < data->size(); i++) {
+      const Discipline &d = (*data)[i];
+      int rowY = startY + (i * gap);
+      uint16_t color = d.valid ? TFT_GREEN : TFT_RED;
+
+      tft->setTextColor(color, _ui->getBackgroundColor());
+      tft->setTextSize(2);
+
+      tft->setTextDatum(TL_DATUM);
+      tft->drawString(d.name, 20, rowY);
+
+      tft->setTextDatum(TC_DATUM);
+      tft->drawString(d.completed ? String(d.resultTime / 1000.0, 2) : "-", 210,
+                      rowY);
+
+      tft->setTextDatum(TR_DATUM);
+      tft->drawString(d.completed ? String(d.endSpeed, 1) : "-", 350, rowY);
+      tft->drawString(String(d.slope, 1), 460, rowY);
+    }
   }
 
-  for (int i = 0; i < data->size(); i++) {
-    const Discipline &d = (*data)[i];
-    int rowY = startY + (i * gap);
-
-    // Color: Red if invalid, Green/White otherwise
-    // Use flag d.valid
-    uint16_t color = d.valid ? TFT_GREEN : TFT_RED;
-    if (!_summaryShowBest && !d.valid) {
-      // In last run, if invalid show red.
-    }
-    // Actually, let's stick to Green for valid, Red for invalid
-    tft->setTextColor(color, COLOR_BG);
-    tft->setTextSize(2);
-
-    // Name
-    tft->setTextDatum(TL_DATUM);
-    tft->drawString(d.name, 10, rowY);
-
-    // Time
-    tft->setTextDatum(TC_DATUM);
-    if (d.completed) {
-      tft->drawString(String(d.resultTime / 1000.0, 2), 180, rowY);
-    } else {
-      tft->drawString("-", 180, rowY);
-    }
-
-    // End Speed
-    tft->setTextDatum(TR_DATUM);
-    if (d.completed) {
-      tft->drawString(String(d.endSpeed, 1), 340, rowY);
-    } else {
-      tft->drawString("-", 340, rowY);
-    }
-
-    // Slope
-    tft->drawString(String(d.slope, 1), 450, rowY);
-
-    // Invalid Icon? If red, maybe draw a small X?
-    // Rely on color for now.
-  }
-
-  // Footer: Braking Distance
-  tft->drawFastHLine(0, SCREEN_HEIGHT - 25, SCREEN_WIDTH, TFT_WHITE);
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  // Footer: Braking
+  float brakeDist = data->empty() ? 0 : data->back().brakingDistance;
+  tft->setTextColor(TFT_SILVER, _ui->getBackgroundColor());
+  tft->setTextSize(1);
   tft->setTextDatum(TL_DATUM);
-  tft->drawString("Brk Dist:", 10, SCREEN_HEIGHT - 20);
-
-  float brakeDist = 0;
-  if (!data->empty())
-    brakeDist = data->back().brakingDistance;
-
+  tft->drawString("BRAKING DISTANCE:", 40, SCREEN_HEIGHT - 25);
   tft->setTextDatum(TR_DATUM);
+  tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
   tft->drawString(String(brakeDist, 1) + " m", SCREEN_WIDTH - 10,
-                  SCREEN_HEIGHT - 20);
+                  SCREEN_HEIGHT - 25);
 
   _ui->drawStatusBar(true);
 
@@ -984,32 +935,27 @@ void DragMeterScreen::drawSummary() {
 void DragMeterScreen::drawMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
-
-  tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Removed fillScreen - handled by transition
 
   int startY = 60;
-  int btnHeight = 55;
+  int btnHeight = 50;
   int btnWidth = 360;
-  int gap = 10;
+  int gap = 12;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   for (int i = 0; i < _menuItems.size(); i++) {
     int y = startY + (i * (btnHeight + gap));
 
-    // Determine Color based on selection
-    uint16_t btnColor = (i == _selectedMenuIdx) ? TFT_RED : TFT_DARKGREY;
+    uint16_t btnColor = (i == _selectedMenuIdx) ? COLOR_PRIMARY : 0x18E3;
+    uint16_t borderColor = (i == _selectedMenuIdx) ? TFT_CYAN : TFT_DARKGREY;
 
-    tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+    tft->fillRoundRect(x, y, btnWidth, btnHeight, 6, btnColor);
+    tft->drawRoundRect(x, y, btnWidth, btnHeight, 6, borderColor);
+
     tft->setTextColor(TFT_WHITE, btnColor);
     tft->setTextDatum(MC_DATUM);
     tft->setFreeFont(&Org_01);
-    tft->setTextSize(2); // Using Org_01 size 2 to match LapTimer
+    tft->setTextSize(2);
     tft->drawString(_menuItems[i], SCREEN_WIDTH / 2, y + btnHeight / 2 + 2);
   }
   _ui->drawStatusBar(true);
@@ -1024,28 +970,24 @@ void DragMeterScreen::drawMenu() {
 void DragMeterScreen::drawDragModeMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
-
-  tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Removed fillScreen - handled by transition
 
   int startY = 60;
-  int btnHeight = 55;
+  int btnHeight = 50;
   int btnWidth = 360;
-  int gap = 10;
+  int gap = 12;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   for (int i = 0; i < _dragModeItems.size(); i++) {
     int y = startY + (i * (btnHeight + gap));
 
-    // Determine Color based on selection
-    uint16_t btnColor = (i == _selectedDragModeIdx) ? TFT_RED : TFT_DARKGREY;
+    uint16_t btnColor = (i == _selectedDragModeIdx) ? COLOR_PRIMARY : 0x18E3;
+    uint16_t borderColor =
+        (i == _selectedDragModeIdx) ? TFT_CYAN : TFT_DARKGREY;
 
-    tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+    tft->fillRoundRect(x, y, btnWidth, btnHeight, 6, btnColor);
+    tft->drawRoundRect(x, y, btnWidth, btnHeight, 6, borderColor);
+
     tft->setTextColor(TFT_WHITE, btnColor);
     tft->setTextDatum(MC_DATUM);
     tft->setFreeFont(&Org_01);
@@ -1058,32 +1000,28 @@ void DragMeterScreen::drawDragModeMenu() {
 void DragMeterScreen::drawPredictiveMenu() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Back Button
-  tft->setTextColor(COLOR_HIGHLIGHT, COLOR_BG);
-  tft->setTextDatum(TL_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("<", 10, 25);
-
-  tft->drawFastHLine(0, 45, SCREEN_WIDTH, COLOR_SECONDARY);
+  // Removed fillScreen - handled by transition
 
   int startY = 60;
-  int btnHeight = 55;
+  int btnHeight = 50;
   int btnWidth = 360;
-  int gap = 10;
+  int gap = 12;
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   for (int i = 0; i < _predictiveItems.size(); i++) {
     int y = startY + (i * (btnHeight + gap));
 
-    // Determine Color based on selection
-    uint16_t btnColor = (i == _selectedPredictiveIdx) ? TFT_RED : TFT_DARKGREY;
+    uint16_t btnColor = (i == _selectedPredictiveIdx) ? COLOR_PRIMARY : 0x18E3;
+    uint16_t borderColor =
+        (i == _selectedPredictiveIdx) ? TFT_CYAN : TFT_DARKGREY;
 
-    tft->fillRoundRect(x, y, btnWidth, btnHeight, 5, btnColor);
+    tft->fillRoundRect(x, y, btnWidth, btnHeight, 6, btnColor);
+    tft->drawRoundRect(x, y, btnWidth, btnHeight, 6, borderColor);
+
     tft->setTextColor(TFT_WHITE, btnColor);
     tft->setTextDatum(MC_DATUM);
     tft->setFreeFont(&Org_01);
-    tft->setTextSize(2); // Using Org_01 size 2 to match LapTimer
+    tft->setTextSize(2);
     tft->drawString(_predictiveItems[i], SCREEN_WIDTH / 2,
                     y + btnHeight / 2 + 2);
   }
@@ -1102,13 +1040,12 @@ void DragMeterScreen::handlePredictiveTouch(int idx) {
 
   if (idx == 1) { // PREDICTIVE MODE
     _state = STATE_SUMMARY_VIEW;
-    _ui->setTitle("RUN SUMMARY");
     _ui->getTft()->fillScreen(COLOR_BG);
-    drawSummary();
+    drawDashboardStatic(true);
   } else {
     // Normal Mode - maybe back to drag screen?
     _state = STATE_RUNNING;
     _ui->getTft()->fillScreen(COLOR_BG);
-    drawDashboardStatic();
+    drawDashboardStatic(true);
   }
 }

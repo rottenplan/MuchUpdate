@@ -88,6 +88,7 @@ public:
   void setRawDataCallback(RawDataCallback cb) { _dataCallback = cb; }
 
   // Utilities
+  void resetModule(); // Reset GPS hardware/software
   double distanceBetween(double lat1, double long1, double lat2, double long2);
   void getLocalTime(int &h, int &m, int &s, int &d, int &mo, int &y);
 
@@ -101,7 +102,8 @@ private:
 
   // Manual satellite tracking from raw NMEA
   int _satsInView = 0;
-  String _nmeaBuffer = "";
+  char _nmeaBuffer[128];
+  int _nmeaPos = 0;
 
   RawDataCallback _dataCallback = nullptr;
 
