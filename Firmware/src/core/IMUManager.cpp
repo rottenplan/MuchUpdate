@@ -15,7 +15,9 @@ void IMUManager::begin() {
   if (status == 0) {
     _isConnected = true;
     Serial.println("MPU6050: Connected!");
-    _mpu.calcOffsets(); // Initial sensor calibration
+    _mpu.calcOffsets(true,
+                     false); // Calibrate only Gyro at startup to prevent drift
+                             // while preserving manual Accel level calibration.
 
     // Load user offsets and enabled state
     Preferences prefs;

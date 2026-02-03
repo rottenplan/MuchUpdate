@@ -31,13 +31,11 @@ void SynchronizeScreen::onShow() {
   tft->setTextDatum(TC_DATUM);
   tft->drawString("SYNCHRONIZE", SCREEN_WIDTH / 2, headY + 8);
 
-  // Back Arrow
-  tft->setTextSize(1); // Standard arrow size
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
-  tft->drawString("<", 10, 25);
-
   drawScreen(true);
+
+  // Back Button (Blue Triangle) - Bottom Left
+  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                    SCREEN_HEIGHT - 19, TFT_BLUE);
 }
 
 void SynchronizeScreen::update() {
@@ -64,6 +62,9 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
   // Header ends approx y=40-45. Start clearing at 50.
   if (fullRedraw) {
     tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, L_COLOR_BG);
+    // Draw Back Button again on full redraw
+    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                      SCREEN_HEIGHT - 19, TFT_BLUE);
   }
 
   // --- STATUS CARD ---
@@ -134,8 +135,8 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
 }
 
 void SynchronizeScreen::handleTouch(int x, int y) {
-  // Back button area
-  if (x < 50 && y < 50) {
+  // Back Button Area (Bottom Left)
+  if (x < 80 && y > SCREEN_HEIGHT - 60) {
     static unsigned long lastBackTap = 0;
     if (millis() - lastBackTap < 500) {
       _ui->switchScreen(SCREEN_MENU);

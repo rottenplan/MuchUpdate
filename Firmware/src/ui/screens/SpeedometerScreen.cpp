@@ -32,13 +32,10 @@ void SpeedometerScreen::onShow() {
 void SpeedometerScreen::update() {
   // 1. Tombol Kembali
   UIManager::TouchPoint p = _ui->getTouchPoint();
-  if (p.x != -1 && p.x < 60 && p.y < 60) {
+  // Back Button Area (Bottom Left)
+  if (p.x != -1 && p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
     static unsigned long lastBackTap = 0;
     if (millis() - lastBackTap < 500) {
-      if (PIN_RPM_INPUT >= 0) {
-        // detachInterrupt(digitalPinToInterrupt(PIN_RPM_INPUT)); // STOP SENSOR
-        // - NO, IT'S GLOBAL NOW
-      }
       _ui->switchScreen(SCREEN_MENU);
       lastBackTap = 0;
     } else {
@@ -125,17 +122,17 @@ void SpeedometerScreen::drawDashboard(bool force) {
   uint16_t colCardBorder = TFT_DARKGREY;
 
   // Layout Constants (Optimized for 480x320)
-  int cardY = 25;
+  int cardY = 30; // Slightly lower for better breathing room
   int cardH = 50;
   int cardW = 130;
   int gap = 15;
   int startX = 25;
-  int bottomCardY = 210; // New card row height
+  int bottomCardY = 195; // Moved up from 210 to give more space at bottom
 
   // Y Positions
   int valY = cardY + 30;
   int bottomValY = bottomCardY + 30;
-  int speedY = 140;
+  int speedY = 130; // Centered Speed more vertically
   int unitY = speedY + 50;
 
   if (force) {
@@ -187,7 +184,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->drawCentreString("km/h", SCREEN_WIDTH / 2, unitY, 1);
 
     // --- RPM BAR OUTLINE ---
-    int rpmY = 290;
+    int rpmY = 265; // Moved up from 290
     int rpmH = 12;
     int rpmW = 400;
     int rpmX = (SCREEN_WIDTH - rpmW) / 2;
@@ -195,6 +192,11 @@ void SpeedometerScreen::drawDashboard(bool force) {
     tft->drawRect(rpmX - 1, rpmY - 1, rpmW + 2, rpmH + 2, TFT_DARKGREY);
     tft->setTextDatum(MR_DATUM);
     tft->drawString("RPM", rpmX - 10, rpmY + 6);
+
+    // --- BACK BUTTON (Blue Triangle) ---
+    // Drawn at bottom so it's over everything
+    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
+                      SCREEN_HEIGHT - 19, TFT_BLUE);
   }
 
   // --- DYNAMIC UPDATES ---
@@ -247,7 +249,7 @@ void SpeedometerScreen::drawDashboard(bool force) {
   tft->setTextPadding(0);
 
   // 4. RPM BAR
-  int rpmY = 290;
+  int rpmY = 265; // MATCH OUTLINE
   int rpmH = 12;
   int rpmW = 400;
   int rpmX = (SCREEN_WIDTH - rpmW) / 2;

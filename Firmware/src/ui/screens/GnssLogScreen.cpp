@@ -39,6 +39,16 @@ void GnssLogScreen::onShow() {
   tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
                     SCREEN_HEIGHT - 19, TFT_BLUE);
 
+  // Clear Button (Orange Label) - Bottom Right
+  tft->fillRoundRect(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 35, 60, 25, 4,
+                     TFT_ORANGE);
+  tft->setTextColor(TFT_BLACK, TFT_ORANGE);
+  tft->setTextDatum(MC_DATUM);
+  tft->setTextFont(1);
+  tft->setTextSize(1);
+  tft->setFreeFont(NULL);
+  tft->drawString("CLEAR", SCREEN_WIDTH - 40, SCREEN_HEIGHT - 23);
+
   // --- FONT SAFETY ---
   tft->setTextSize(1);
   tft->setFreeFont(NULL);
@@ -150,6 +160,16 @@ void GnssLogScreen::update() {
     // Toggle Pause (Tap on log area)
     if (p.x > 20 && p.x < 460 && p.y > 90 && p.y < 280) {
       _paused = !_paused;
+      _needsRedraw = true;
+    }
+
+    // Clear Button (Bottom Right)
+    if (p.x > SCREEN_WIDTH - 100 && p.y > SCREEN_HEIGHT - 50) {
+      _lines.clear();
+      _buffer = "";
+      TFT_eSPI *tft = _ui->getTft();
+      tft->fillRoundRect(20, 95, 440, 180, 8, 0x18E3);
+      tft->drawRoundRect(20, 95, 440, 180, 8, TFT_DARKGREY);
       _needsRedraw = true;
     }
   }
