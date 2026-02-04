@@ -243,7 +243,7 @@ void GPSManager::update() {
       // ALSO: Only increment distance if we have a high quality fix and are
       // moving above deadzone speed
       bool highQualityFix = (_fixType >= 3 && _satelliteCount >= GPS_MIN_SATS &&
-                             _hdop <= GPS_MAX_PDOP);
+                             _pdop <= GPS_MAX_PDOP);
       if (dist > 2.0 && dist < 1000.0 && _currentSpeed >= GPS_SPEED_DEADZONE &&
           highQualityFix) {
         _totalDistance += dist;
@@ -362,7 +362,39 @@ float GPSManager::getSpeedKmph() {
   // Check if we have a high-quality 3D/GNSS+DR fix and enough satellites
   // This helps prevent "ghost" speed readings when the device is stationary or
   // signal is weak
-  if (_fixType < 3 || _satelliteCount < GPS_MIN_SATS || _hdop > GPS_MAX_PDOP) {
+
+  // DISABLED: Debug logging (impacts performance)
+  // DEBUG: Log every 2 seconds
+  // static unsigned long lastDebug = 0;
+  // if (millis() - lastDebug >= 2000) {
+  //   Serial.print("GPS Speed Debug: Raw=");
+  //   Serial.print(_currentSpeed, 2);
+  //   Serial.print(" km/h, FixType=");
+  //   Serial.print(_fixType);
+  //   Serial.print(", Sats=");
+  //   Serial.print(_satelliteCount);
+  //   Serial.print(", PDOP=");
+  //   Serial.print(_pdop, 2);
+  //   Serial.print(", Filtered=");
+  //
+  //   if (_fixType < 3 || _satelliteCount < GPS_MIN_SATS ||
+  //       _pdop > GPS_MAX_PDOP) {
+  //     Serial.println("REJECTED (Quality)");
+  //     lastDebug = millis();
+  //     return 0.0f;
+  //   }
+  //
+  //   float speed = _currentSpeed;
+  //   if (speed < GPS_SPEED_DEADZONE) {
+  //     Serial.print(speed, 2);
+  //     Serial.println(" (Deadzone)");
+  //   } else {
+  //     Serial.println(speed, 2);
+  //   }
+  //   lastDebug = millis();
+  // }
+
+  if (_fixType < 3 || _satelliteCount < GPS_MIN_SATS || _pdop > GPS_MAX_PDOP) {
     return 0.0f;
   }
 
@@ -503,9 +535,11 @@ int GPSManager::getRawMinute() {
 }
 
 double GPSManager::getHDOP() {
-  // 1. Use UBX-parsed HDOP if available (valid is < 99.9)
-  if (_hdop < 99.0) {
-    return _hdop;
+  // 1. Use UBX-parsed PDOP if available (valid is < 99.9)
+  // Note: Variable is PDOP, not HDOP. UBX-NAV-PVT doesn't provide HDOP
+  // directly.
+  if (_pdop < 99.0) {
+    return _pdop;
   }
   // 2. Fallback to TinyGPS++ NMEA parsing
   if (_gps.hdop.isValid()) {
@@ -1018,7 +1052,7 @@ void GPSManager::resetModule() {
   _hasValidFix = false;
   _satelliteCount = 0;
   _satsInView = 0;
-  _hdop = 99.9;
+  _pdop = 99.9;
 
   // Re-init some configs after a short delay
   delay(500);
@@ -1182,7 +1216,7 @@ void GPSManager::parseUBXNavPvt() {
 
   // Extract PDOP (offset 76, 2 bytes, 0.01)
   uint16_t pdopRaw = *((uint16_t *)(&_ubxPayload[76]));
-  _hdop = pdopRaw / 100.0;
+  _pdop = pdopRaw / 100.0;
 
   // Extract date/time if valid (offset 11 - valid flags)
   // Bit 0: Valid Date, Bit 1: Valid Time. Both must be 1 (0x03)

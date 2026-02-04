@@ -57,8 +57,9 @@
 #define PIN_GPS_TX 21 // Restored Pin 21 for TX since TOUCH_INT is -1 (Polling)
 #define GPS_BAUD 115200
 #define PREDICTIVE_DELTA_LIMIT 5.0 // Max delta seconds for bar display
-#define GPS_SPEED_DEADZONE 1.5     // km/h threshold to ignore GPS noise
-#define GPS_MIN_SATS 5             // Minimum satellites for a reliable speed
+#define GPS_SPEED_DEADZONE                                                     \
+  3.5 // km/h threshold to ignore GPS noise (increased from 1.5 to filter drift)
+#define GPS_MIN_SATS 5   // Minimum satellites for a reliable speed
 #define GPS_MAX_PDOP 5.0 // Maximum Dilution of Precision (lower is better)
 // #define PIN_LIGHT_SENSOR 34
 #define PIN_BATTERY 34 // Enabled per user request

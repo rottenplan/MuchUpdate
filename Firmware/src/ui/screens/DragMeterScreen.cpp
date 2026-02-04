@@ -189,34 +189,36 @@ void DragMeterScreen::update() {
 
   // 2. Continuous Logic (Independent of Touch)
   if (_state == STATE_RUNNING) {
-    if (_runState == RUN_WAITING) {
-      checkStartCondition();
-    } else if (_runState == RUN_COUNTDOWN) {
+    if (_runState == RUN_COUNTDOWN) {
+      // Countdown timer
       unsigned long elapsed = millis() - _startTime;
       if (elapsed >= _treeInterval) {
         _runState = RUN_RUNNING;
         _runStartTime = millis();
-        drawDashboardStatic(true);
         sessionManager.startSession();
       }
     } else if (_runState == RUN_RUNNING) {
       checkStopCondition();
       updateDisciplines();
     }
-    drawDashboardDynamic();
 
+    // Overlay rendering during countdown and GO phase
     bool inGoPhase =
         (_runState == RUN_RUNNING && (millis() - _runStartTime < 1000));
-    bool currentOverlayActive = (_runState == RUN_COUNTDOWN || inGoPhase);
-    if (currentOverlayActive) {
+    bool showOverlay = (_runState == RUN_COUNTDOWN || inGoPhase);
+
+    if (showOverlay) {
       drawChristmasTreeOverlay();
+    } else {
+      drawDashboardDynamic();
     }
+    _wasOverlayActive = showOverlay;
   }
 }
 
 void DragMeterScreen::checkStartCondition() {
   float speed = gpsManager.getSpeedKmph();
-  if (speed > 1.0) { // Moving (> 1 km/h)
+  if (speed > 5.0) { // Moving (> 5 km/h)
     unsigned long now = millis();
 
     if (_runState == RUN_WAITING) {
@@ -581,19 +583,21 @@ void DragMeterScreen::drawChristmasTreeOverlay() {
     boxH = bottomH;
   }
 
-  // Background color: 0x18E3 (Blue) for count, Green for GO
-  uint16_t bgColor = isGo ? TFT_GREEN : 0x18E3;
+  // Background color: Green for GO, Blue for countdown
+  uint16_t bgColor = isGo ? TFT_GREEN : 0x18E3; // Blue
 
-  if (_lastTreeIsGo != isGo || _lastTreeCount == -1) {
+  if (_lastTreeIsGo != isGo || _lastTreeCount == -1 ||
+      currentCount != _lastTreeCount) {
     _lastTreeIsGo = isGo;
+    // Force full redraw of box background
     tft->fillRoundRect(boxX, boxY, boxW, boxH, 8, bgColor);
     tft->drawRoundRect(boxX, boxY, boxW, boxH, 8, TFT_WHITE);
 
     if (isGo) {
       tft->setTextDatum(MC_DATUM);
-      tft->setTextColor(TFT_BLACK, bgColor);
-      tft->setTextFont(4);
-      tft->setTextSize(2);
+      tft->setTextColor(TFT_WHITE, bgColor);
+      tft->setTextFont(7);
+      tft->setTextSize(1);
       tft->drawString("GO!", boxX + boxW / 2, boxY + boxH / 2);
     }
   }

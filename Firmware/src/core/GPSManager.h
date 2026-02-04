@@ -122,7 +122,7 @@ private:
   double _altitude = 0.0;
   double _currentSpeed = 0.0;
   double _heading = 0.0;
-  double _hdop = 99.9;
+  double _pdop = 99.9; // Position DOP from UBX-NAV-PVT
   unsigned long _lastUpdateTime = 0;
   unsigned long _totalBytesReceived =
       0; // DIAGNOSTIC: Track total bytes from GPS

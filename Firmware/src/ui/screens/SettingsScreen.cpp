@@ -72,7 +72,8 @@ void SettingsScreen::loadSettings() {
   _settings.clear();
 
   if (_currentMode == MODE_MAIN) {
-    _settings.push_back({"CLOCK SETTING", TYPE_ACTION});
+    // _settings.push_back({"CLOCK SETTING", TYPE_ACTION}); // Removed per
+    // request
 
     _prefs.begin("laptimer", false);
 
@@ -172,29 +173,6 @@ void SettingsScreen::loadSettings() {
 
     // MPU6050 Setting (Moved from Utility)
     _settings.push_back({"G-FORCE CALIBRATION", TYPE_ACTION});
-
-    _prefs.end();
-  } else if (_currentMode == MODE_CLOCK) {
-    _prefs.begin("laptimer", false);
-
-    // UTC Time Zone
-    SettingItem utcZone = {"UTC TIME ZONE", TYPE_VALUE, "utc_offset_idx"};
-    for (int i = -12; i <= 12; i++) {
-      char buf[16];
-      if (i == 0)
-        sprintf(buf, "UTC +00:00");
-      else
-        sprintf(buf, "UTC %s%02d:00", (i > 0 ? "+" : ""), i);
-      utcZone.options.push_back(String(buf));
-    }
-    extern GPSManager gpsManager;
-    utcZone.currentOptionIdx =
-        _prefs.getInt("utc_offset_idx", gpsManager.getUtcOffset() + 12);
-    extern GPSManager gpsManager;
-    gpsManager.setUtcOffset(utcZone.currentOptionIdx - 12); // Ensure sync
-    _settings.push_back(utcZone);
-
-    _settings.push_back({"MANUAL CLOCK ADJUST", TYPE_ACTION});
 
     _prefs.end();
   } else if (_currentMode == MODE_GNSS_CONFIG) {
@@ -619,6 +597,72 @@ void SettingsScreen::handleTouchPoint() {
 
   static unsigned long lastSettingTouch = 0;
 
+  // --- SPECIAL MODE HANDLING ---
+  if (_currentMode == MODE_IMU_CALIBRATE) {
+    // 1. Back Button (Top-Left) - expanded touch area
+    if (p.x < 80 && p.y < 80) {
+      if (millis() - lastSettingTouch < 200)
+        return;
+      lastSettingTouch = millis();
+
+      _currentMode = MODE_RPM;
+      _ui->setTitle("SENSOR SETTINGS");
+      loadSettings();
+      _scrollOffset = 0;
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
+      return;
+    }
+
+    // 2. Calibrate Button (Bottom Center)
+    // Matches drawIMUCalibration: btnW=300, btnH=45, Y=SCREEN_HEIGHT-60
+    // Visual: 260 to 305 (approx)
+    // Touch Area: Expanded generously to catch misses
+    int btnW = 300;
+    int btnH = 45;
+    int btnX = (SCREEN_WIDTH - btnW) / 2;
+    int btnY = SCREEN_HEIGHT - btnH - 15;
+
+    // Expanded touch box:
+    // X: +/- 20px tolerance
+    // Y: From top of button (minus 10px) to BOTTOM of screen (catch low
+    // touches)
+    if (p.x > (btnX - 20) && p.x < (btnX + btnW + 20) && p.y > (btnY - 15)) {
+      if (millis() - lastSettingTouch < 500)
+        return; // Debounce
+      lastSettingTouch = millis();
+
+      // Visual Feedback: Show "CALIBRATING..." in Orange
+      _ui->getTft()->fillRoundRect(btnX, btnY, btnW, btnH, 6, TFT_ORANGE);
+      _ui->getTft()->setTextColor(TFT_BLACK, TFT_ORANGE);
+      _ui->getTft()->setTextDatum(MC_DATUM);
+      _ui->getTft()->setTextFont(2);
+      _ui->getTft()->setTextSize(1);
+      _ui->getTft()->drawString("CALIBRATING...", SCREEN_WIDTH / 2,
+                                btnY + btnH / 2);
+
+      // Delay to let user see the feedback
+      delay(200);
+
+      // Trigger Calibration (Blocking)
+      imuManager.calibrateLevel();
+
+      // Show "DONE!" in Green
+      _ui->getTft()->fillRoundRect(btnX, btnY, btnW, btnH, 6, TFT_GREEN);
+      _ui->getTft()->setTextColor(TFT_BLACK, TFT_GREEN);
+      _ui->getTft()->drawString("DONE!", SCREEN_WIDTH / 2, btnY + btnH / 2);
+      delay(500); // Hold success message
+
+      // Restore Button
+      drawIMUCalibration(true); // Redraw to clear feedback
+      return;
+    }
+
+    return; // Ignore other touches in this mode
+  }
+
   // 1. Footer Buttons Zone (Standardized Bottom-Bar y >= 280)
   if (p.y >= 280) {
     if (millis() - lastSettingTouch < 200)
@@ -860,15 +904,7 @@ void SettingsScreen::handleTouch(int idx) {
     saveSetting(idx);
     drawList(_scrollOffset, false);
   } else if (item.type == TYPE_ACTION) {
-    if (item.name == "CLOCK SETTING") {
-      _currentMode = MODE_CLOCK;
-      loadSettings();
-      // Clear only content area
-      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-      _ui->switchScreen(SCREEN_TIME_SETTINGS);
-      return;
-    } else if (item.name == "OFFLINE SERVER") {
+    if (item.name == "OFFLINE SERVER") {
       _ui->switchScreen(SCREEN_WEB_SERVER);
       return;
     } else if (item.name == "GPS DEBUG") {
