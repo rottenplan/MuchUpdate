@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#define FIRMWARE_VERSION "v2.1.28-ESP32SL"
+#define FIRMWARE_VERSION "v2.1.28"
 
 // ==========================================
 // HARDWARE PIN DEFINITIONS

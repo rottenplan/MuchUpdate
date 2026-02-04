@@ -89,6 +89,10 @@ private:
   unsigned long _reactionTime;
   unsigned long _runStartTime;
   float _startPosition; // To track distance for rollout
+  int _lastTreeCount;
+  bool _lastTreeIsGo;
+  bool _wasOverlayActive;
+  uint16_t _lastHighlightBgColor;
 
   // Geometric Tracking
   double _startLat = 0.0;

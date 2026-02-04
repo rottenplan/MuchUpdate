@@ -111,6 +111,9 @@ void SettingsScreen::loadSettings() {
     // Sensor Settings Sub-menu (Renamed from RPM)
     _settings.push_back({"SENSOR SETTING", TYPE_ACTION});
 
+    // Drag Settings (New per user request)
+    _settings.push_back({"DRAG SETTINGS", TYPE_ACTION});
+
     // Connection Setup Sub-menu
     _settings.push_back({"CONNECTION SETUP", TYPE_ACTION});
 
@@ -373,6 +376,16 @@ void SettingsScreen::loadSettings() {
     _settings.push_back(pitchOff);
 
     _prefs.end();
+  } else if (_currentMode == MODE_DRAG) {
+    _prefs.begin("laptimer", false);
+
+    // Christmas Tree Duration
+    SettingItem tree = {"CHRISTMAS TREE", TYPE_VALUE, "drag_tree_sec"};
+    tree.options = {"3 seconds", "5 seconds", "7 seconds"};
+    tree.currentOptionIdx = _prefs.getInt("drag_tree_sec", 1); // Default 5s
+    _settings.push_back(tree);
+
+    _prefs.end();
   }
 }
 
@@ -605,68 +618,9 @@ void SettingsScreen::handleTouchPoint() {
   lastInteraction = millis();
 
   static unsigned long lastSettingTouch = 0;
-  // 0. Header Back Triangle (Top-Left) - Standardized Touch Box
-  if (p.y < 50 && p.x < 80) {
-    if (millis() - lastSettingTouch < 250)
-      return;
-    lastSettingTouch = millis();
 
-    if (_currentMode == MODE_WIFI_PASS) {
-      _currentMode = MODE_WIFI;
-      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-      _ui->drawStatusBar(true);
-      drawWiFiList(true);
-      return;
-    } else if (_currentMode == MODE_IMU_CALIBRATE ||
-               _currentMode == MODE_ENGINE) {
-      // Direct jump back to Sensor Settings (MODE_RPM)
-      _currentMode = MODE_RPM;
-      _ui->setTitle("SENSOR SETTINGS");
-      loadSettings();
-      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
-      _ui->drawStatusBar(true);
-      drawList(0, true);
-      return;
-    } else if (_currentMode != MODE_MAIN) {
-      // Standardized footer jump (Go back to main menu loop)
-      p.y = 280;
-      p.x = 40;
-    }
-  }
-
-  // 2. Calibrate Button (Bottom Center)
-  if (_currentMode == MODE_IMU_CALIBRATE) {
-    int btnW = 300;
-    int btnH = 45;
-    int btnX = (SCREEN_WIDTH - btnW) / 2;
-    int btnY = SCREEN_HEIGHT - btnH - 15;
-
-    if (p.x > btnX && p.x < btnX + btnW && p.y > btnY && p.y < btnY + btnH) {
-      // Visual feedback
-      TFT_eSPI *tft = _ui->getTft();
-      tft->fillRoundRect(btnX, btnY, btnW, btnH, 6, TFT_YELLOW);
-      tft->setTextColor(TFT_BLACK, TFT_YELLOW);
-      tft->setTextDatum(MC_DATUM);
-      tft->setTextFont(2);
-      tft->drawString("Calibrating...", SCREEN_WIDTH / 2, btnY + btnH / 2);
-
-      delay(500);
-      imuManager.calibrateLevel();
-
-      tft->fillRoundRect(btnX, btnY, btnW, btnH, 6, TFT_GREEN);
-      tft->setTextColor(TFT_BLACK, TFT_GREEN);
-      tft->drawString("DONE!", SCREEN_WIDTH / 2, btnY + btnH / 2);
-      delay(500);
-
-      drawIMUCalibration(true);
-    }
-    return; // Consume touch if in calibrate mode and button was pressed
-  }
-
-  // 1. Footer Buttons Zone (Standardized Bottom-Bar y > 240)
-  if (p.y > 240) {
+  // 1. Footer Buttons Zone (Standardized Bottom-Bar y >= 280)
+  if (p.y >= 280) {
     if (millis() - lastSettingTouch < 200)
       return;
     lastSettingTouch = millis();
@@ -693,6 +647,10 @@ void SettingsScreen::handleTouchPoint() {
         drawWiFiList(true);
         return;
       } else if (_currentMode == MODE_WIFI_MENU) {
+        _currentMode = MODE_MAIN;
+        _ui->setTitle("SETTINGS");
+        loadSettings();
+      } else if (_currentMode == MODE_DRAG) {
         _currentMode = MODE_MAIN;
         _ui->setTitle("SETTINGS");
         loadSettings();
@@ -733,8 +691,8 @@ void SettingsScreen::handleTouchPoint() {
     if (p.x > SCREEN_WIDTH - 120 &&
         (p.y > 280 || _currentMode != MODE_WIFI_PASS)) {
       int listY = 40;
-      int itemH = 24;
-      int maxY = 260;
+      int itemH = 32;
+      int maxY = 280;
       int visibleItems = (maxY - listY) / itemH;
 
       if (p.x < SCREEN_WIDTH - 60) { // Up
@@ -752,15 +710,16 @@ void SettingsScreen::handleTouchPoint() {
     }
   }
 
-  // 2. List Zone (40 to 260)
+  // 2. List Zone (40 to 280)
   int listY = 40;
-  int itemH = 24;
-  int maxY = 260;
+  int itemH = 32;
+  int maxY = 280;
 
   if (_currentMode == MODE_MAIN || _currentMode == MODE_RPM ||
       _currentMode == MODE_CLOCK || _currentMode == MODE_ENGINE ||
       _currentMode == MODE_GNSS_CONFIG || _currentMode == MODE_WIFI_MENU ||
-      _currentMode == MODE_UTILITY || _currentMode == MODE_IMU) {
+      _currentMode == MODE_UTILITY || _currentMode == MODE_IMU ||
+      _currentMode == MODE_DRAG) {
     if (p.y >= listY && p.y < maxY) {
       if (millis() - lastSettingTouch < 200)
         return;
@@ -768,13 +727,21 @@ void SettingsScreen::handleTouchPoint() {
 
       int idx = _scrollOffset + ((p.y - listY) / itemH);
       if (idx >= 0 && idx < _settings.size()) {
-        // Simple Single-Tap to select and double-tap effect or single-tap
-        // action
-        if (_selectedIdx == idx) {
-          handleTouch(idx); // Already selected -> Execute
-        } else {
-          _selectedIdx = idx; // Select first
-          drawList(_scrollOffset, false);
+        SettingItem &item = _settings[idx];
+
+        if (item.type == TYPE_VALUE || item.type == TYPE_TOGGLE) {
+          // --- SINGLE TAP for Toggles/Values ---
+          _selectedIdx = idx;
+          handleTouch(idx);
+          _lastTapIdx = -1; // Reset tap logic
+        } else if (item.type == TYPE_ACTION) {
+          // --- DOUBLE TAP for Actions (Navigation) ---
+          if (_selectedIdx == idx) {
+            handleTouch(idx); // Already selected -> Execute
+          } else {
+            _selectedIdx = idx; // Select first
+            drawList(_scrollOffset, false);
+          }
         }
       }
     }
@@ -963,6 +930,15 @@ void SettingsScreen::handleTouch(int idx) {
     } else if (item.name == "SENSOR SETTING") {
       _currentMode = MODE_RPM;
       _ui->setTitle("SENSOR SETTINGS");
+      loadSettings();
+      _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+      _ui->drawStatusBar(true);
+      drawList(0, true);
+      return;
+    } else if (item.name == "DRAG SETTINGS") {
+      _currentMode = MODE_DRAG;
+      _ui->setTitle("DRAG SETTINGS");
       loadSettings();
       _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
@@ -1347,23 +1323,13 @@ void SettingsScreen::drawGPSStatus(bool force) {
 void SettingsScreen::drawSDTest() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Clear Content
-  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
+  // 1. Base UI Alignment (Matches drawAbout)
+  tft->fillScreen(_ui->getBackgroundColor());
+  _ui->drawStatusBar(true);
 
-  // Header (Premium)
-  tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);
-  tft->setTextColor(TFT_WHITE, TFT_BLACK);
-  tft->setTextDatum(TC_DATUM);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(2);
-  tft->drawString("SD CARD TEST", SCREEN_WIDTH / 2, 28);
-
-  // Back Button (Blue Triangle)
+  // Back Button (Blue Triangle) - Matches drawAbout
   tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
                     SCREEN_HEIGHT - 20, TFT_BLUE);
-
-  int y = 60;
 
   if (!_sdResult.success && _sdResult.cardType == "") {
     // Background and status handled by sdProgressCallback
@@ -1372,80 +1338,78 @@ void SettingsScreen::drawSDTest() {
 
   if (!_sdResult.success && _sdResult.cardType == "NO CARD") {
     // Error Card
-    tft->fillRoundRect(20, 80, SCREEN_WIDTH - 40, 100, 8, 0x18E3);
-    tft->drawRoundRect(20, 80, SCREEN_WIDTH - 40, 100, 8, TFT_RED);
+    int errorCardY = 80;
+    tft->fillRoundRect(20, errorCardY, SCREEN_WIDTH - 40, 100, 10, 0x18E3);
+    tft->drawRoundRect(20, errorCardY, SCREEN_WIDTH - 40, 100, 10, TFT_RED);
 
     tft->setTextColor(TFT_RED, 0x18E3);
     tft->setTextDatum(MC_DATUM);
     tft->setTextFont(4);
-    tft->drawString("NO SD CARD", SCREEN_WIDTH / 2, 120);
+    tft->drawString("NO SD CARD", SCREEN_WIDTH / 2, errorCardY + 40);
+
     tft->setTextFont(2);
     tft->setTextColor(TFT_SILVER, 0x18E3);
-    tft->drawString("Please Insert Card", SCREEN_WIDTH / 2, 150);
-    tft->setTextColor(TFT_RED, 0x18E3);
-    tft->setTextDatum(MC_DATUM);
-    tft->setTextFont(4);
-    tft->drawString("RaceBox Pro Firmware", SCREEN_WIDTH / 2, 280);
-    tft->setFreeFont(NULL); // Reset to default for version
-    tft->drawString(FIRMWARE_VERSION, SCREEN_WIDTH / 2, 305);
+    tft->drawString("Please Insert Card", SCREEN_WIDTH / 2, errorCardY + 70);
 
     // --- FONT SAFETY ---
     tft->setTextSize(1);
     tft->setFreeFont(NULL);
     tft->setTextFont(1);
-    tft->setTextPadding(0);
     return;
   }
 
-  // --- RESULT CARD (Clean Vertical Layout) ---
+  // --- RESULT CARD (Matches About Screen Styling) ---
   int cardX = 20;
-  int cardY = 60; // Slightly lower than header
+  int cardY = 50; // Matches drawAbout
   int cardW = SCREEN_WIDTH - 40;
-  int cardH = 250; // Increased height to prevent overflow
+  int cardH = 210; // Slightly taller to fit metrics
 
   tft->fillRoundRect(cardX, cardY, cardW, cardH, 10, 0x18E3); // Charcoal
   tft->drawRoundRect(cardX, cardY, cardW, cardH, 10, TFT_DARKGREY);
 
-  // Content
-  int startY = cardY + 25; // More top padding
-  int lineH = 32;          // Slightly tighter spacing
+  // Content Scaling & Positioning
+  int startY = cardY + 20;
 
   tft->setTextDatum(TC_DATUM);
-  tft->setTextFont(2); // Standard font for everything
 
-  // 1. Header
+  // 1. Header (Font 4 like "Much Racing")
   tft->setTextColor(TFT_WHITE, 0x18E3);
-  tft->drawString("TEST RESULTS", SCREEN_WIDTH / 2, startY);
-  tft->drawFastHLine(cardX + 60, startY + 22, cardW - 120, TFT_DARKGREY);
+  tft->setTextFont(4);
+  tft->drawString("SD CARD TEST", SCREEN_WIDTH / 2, startY);
 
-  startY += lineH + 5;
+  tft->setTextFont(2);
+  tft->setTextColor(TFT_CYAN, 0x18E3);
+  tft->drawString("Performance Benchmark", SCREEN_WIDTH / 2, startY + 30);
 
-  // 2. Type
+  tft->drawFastHLine(cardX + 40, startY + 55, cardW - 80, TFT_DARKGREY);
+
+  startY += 70;
+  int lineH = 26;
+
+  // 2. Type & Size
   tft->setTextColor(TFT_SILVER, 0x18E3);
-  tft->drawString("Type: " + _sdResult.cardType, SCREEN_WIDTH / 2, startY);
-
-  startY += lineH;
-
-  // 3. Size
-  tft->drawString("Size: " + _sdResult.sizeLabel, SCREEN_WIDTH / 2, startY);
-
-  startY += lineH;
-
-  // 4. Used
-  tft->drawString("Used: " + _sdResult.usedLabel, SCREEN_WIDTH / 2, startY);
-
-  startY += lineH;
-
-  // 5. Read
-  tft->setTextColor(TFT_GREEN, 0x18E3);
-  tft->drawString("Read: " + String(_sdResult.readSpeedKBps, 0) + " KB/s",
+  tft->drawString("Type: " + _sdResult.cardType +
+                      " | Size: " + _sdResult.sizeLabel,
                   SCREEN_WIDTH / 2, startY);
 
   startY += lineH;
 
-  // 6. Write
+  // 3. Used Space
+  tft->drawString("Capacity Used: " + _sdResult.usedLabel, SCREEN_WIDTH / 2,
+                  startY);
+
+  startY += lineH + 10;
+
+  // 4. Performance Metrics
+  tft->setTextColor(TFT_GREEN, 0x18E3);
+  tft->drawString("Read Speed: " + String(_sdResult.readSpeedKBps, 0) + " KB/s",
+                  SCREEN_WIDTH / 2, startY);
+
+  startY += lineH;
+
   tft->setTextColor(TFT_CYAN, 0x18E3);
-  tft->drawString("Write: " + String(_sdResult.writeSpeedKBps, 0) + " KB/s",
+  tft->drawString("Write Speed: " + String(_sdResult.writeSpeedKBps, 0) +
+                      " KB/s",
                   SCREEN_WIDTH / 2, startY);
 
   // --- FONT SAFETY ---
@@ -1470,8 +1434,8 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
 
   // List (starts at y=40, after header)
   int listY = 40;
-  int itemH = 24; // Shrunk for density
-  int maxY = 260; // Clean break before footer
+  int itemH = 32; // Increased from 24 for better hit area
+  int maxY = 280; // Extended from 264 to align with new touch logic
 
   // Clear list area to prevent ghosts when scrolling
   if (force) {
@@ -1523,7 +1487,7 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
       if (item.type == TYPE_VALUE) {
         if (item.currentOptionIdx >= 0 &&
             item.currentOptionIdx < item.options.size()) {
-          valText = item.options[item.currentOptionIdx];
+          valText = item.options[item.currentOptionIdx] + " >";
         }
       } else if (item.type == TYPE_TOGGLE) {
         valText = "";
@@ -1563,16 +1527,16 @@ void SettingsScreen::drawList(int scrollOffset, bool force) {
                       SCREEN_HEIGHT - 20, TFT_BLUE);
 
     // Scroll Buttons (Right Edge) - 16x10 standard
-    int scrollX = SCREEN_WIDTH - 100;
+    int scrollX = SCREEN_WIDTH - 120; // Shifted left more
     // Up Arrow
     if (scrollOffset > 0) {
-      tft->fillTriangle(scrollX, 295, scrollX + 16, 295, scrollX + 8, 285,
+      tft->fillTriangle(scrollX, 300, scrollX + 24, 300, scrollX + 12, 285,
                         COLOR_ACCENT);
     }
 
     // Down Arrow
     if (scrollOffset + visibleItems < _settings.size()) {
-      tft->fillTriangle(scrollX + 50, 285, scrollX + 66, 285, scrollX + 58, 295,
+      tft->fillTriangle(scrollX + 60, 285, scrollX + 84, 285, scrollX + 72, 300,
                         COLOR_ACCENT);
     }
   }

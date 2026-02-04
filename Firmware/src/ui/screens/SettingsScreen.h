@@ -21,7 +21,9 @@ public:
     MODE_MAIN,
     MODE_GPS,
     MODE_GNSS_CONFIG,
+    MODE_DIRTY_SD, // Placeholder or actual
     MODE_SD_TEST,
+    MODE_DRAG,
     MODE_RPM,
     MODE_ENGINE,
     MODE_CLOCK,
