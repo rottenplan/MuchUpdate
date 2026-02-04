@@ -57,12 +57,12 @@ private:
 
   // Drawing methods
   void drawWelcome();
-  void drawAccountSetup(bool fullRedraw = true);
+  void drawAccountSetup(bool fullRedraw = true, char highlightChar = '\0');
   void drawWiFiScan();
-  void drawWiFiSetup(bool fullRedraw = true);
+  void drawWiFiSetup(bool fullRedraw = true, char highlightChar = '\0');
   void drawComplete();
 
-  void drawKeyboard(int y, bool isPassword = false);
+  void drawKeyboard(int y, bool isPassword = false, char highlightChar = '\0');
   void drawTextField(const char *label, String value, int y, bool isActive,
                      bool isPassword = false);
   void drawButton(const char *label, int x, int y, int w, int h,

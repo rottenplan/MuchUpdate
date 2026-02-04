@@ -40,6 +40,7 @@ private:
   float _angleX, _angleY, _angleZ;
   float _accX, _accY, _accZ;
   float _rollOffset, _pitchOffset;
+  float _accXOffset, _accYOffset;
   unsigned long _lastUpdate;
 };
 

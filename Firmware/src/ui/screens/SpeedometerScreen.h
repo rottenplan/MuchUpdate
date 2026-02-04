@@ -26,6 +26,10 @@ private:
   bool _lastUnits = false; // false = km/h, true = mph
   float _lastRoll = 0;
   float _lastAccY = 0;
+
+  // Double tap detection
+  unsigned long _lastTapTime = 0;
+  int _tapCount = 0;
 };
 
 #endif

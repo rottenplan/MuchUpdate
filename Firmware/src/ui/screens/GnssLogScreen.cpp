@@ -36,8 +36,7 @@ void GnssLogScreen::onShow() {
                   headerY + 12); // Centered between Status Bar and Line
 
   // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30, SCREEN_HEIGHT - 20, TFT_BLUE);
 
   // Clear Button (Orange Label) - Bottom Right
   tft->fillRoundRect(SCREEN_WIDTH - 70, SCREEN_HEIGHT - 35, 60, 25, 4,
@@ -144,16 +143,10 @@ void GnssLogScreen::update() {
   // Touch Handling
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1) {
-    if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-      // Back (Triangle area)
-      static unsigned long lastBackTap = 0;
-      if (millis() - lastBackTap < 500) {
-        gpsManager.setRawDataCallback(nullptr); // Disable callback
-        _ui->switchScreen(SCREEN_GPS_STATUS);
-        lastBackTap = 0;
-      } else {
-        lastBackTap = millis();
-      }
+    // Back Button (Standardized 100x80)
+    if (p.x < 80 && p.y > 240) {
+      gpsManager.setRawDataCallback(nullptr);
+      _ui->switchScreen(SCREEN_GPS_STATUS);
       return;
     }
 

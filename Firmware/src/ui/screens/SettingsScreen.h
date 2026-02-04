@@ -16,34 +16,8 @@ public:
   void onShow() override;
   void update() override;
 
-private:
-  UIManager *_ui;
-  Preferences _prefs;
-  KeyboardComponent _keyboard;
-
-  enum SettingType { TYPE_TOGGLE, TYPE_VALUE, TYPE_ACTION };
-
-  struct SettingItem {
-    String name;
-    SettingType type;
-    String key; // Preference key
-
-    // For Values
-    std::vector<String> options;
-    int currentOptionIdx;
-
-    // For Toggle
-    bool checkState;
-
-    // For Action
-    // (Simplified: check logic in update)
-  };
-
-  std::vector<SettingItem> _settings;
-  int _scrollOffset;
-  int _selectedIdx;
-
   enum ScreenMode {
+    MODE_NONE,
     MODE_MAIN,
     MODE_GPS,
     MODE_GNSS_CONFIG,
@@ -57,8 +31,31 @@ private:
     MODE_UTILITY,
     MODE_GRAPHIC_TEST,
     MODE_ABOUT,
-    MODE_IMU
+    MODE_IMU,
+    MODE_IMU_CALIBRATE
   };
+  static ScreenMode startMode;
+
+private:
+  UIManager *_ui;
+  Preferences _prefs;
+  KeyboardComponent _keyboard;
+
+  enum SettingType { TYPE_TOGGLE, TYPE_VALUE, TYPE_ACTION };
+
+  struct SettingItem {
+    String name;
+    SettingType type;
+    String key; // Preference key
+    std::vector<String> options;
+    int currentOptionIdx;
+    bool checkState;
+  };
+
+  std::vector<SettingItem> _settings;
+  int _scrollOffset;
+  int _selectedIdx;
+
   ScreenMode _currentMode;
   SessionManager::SDTestResult _sdResult;
 
@@ -81,9 +78,8 @@ private:
   int _touchStartY = -1;
   unsigned long _lastWiFiTouch = 0;
   unsigned long _lastKeyboardTouch = 0;
-  unsigned long _lastGPSUpdate = 0; // Rate limit GPS redraw
+  unsigned long _lastGPSUpdate = 0;
 
-  // GPS Data Trackers for incremental update
   int _lastSats = -1;
   double _lastHdopValue = -1.0;
   double _lastLat = 0;
@@ -95,6 +91,7 @@ private:
   void drawList(int scrollOffset, bool force = false);
   void drawHeader(String title, uint16_t backColor = COLOR_HIGHLIGHT);
   void drawGPSStatus(bool force = false);
+  void drawIMUCalibration(bool force = false);
 
   void drawSDTest();
   void drawAbout();
@@ -120,10 +117,11 @@ private:
 
   // WiFi Draw Functions
   void drawWiFiList(bool force = false);
-  void drawKeyboard(bool fullRedraw = true);
+  void drawKeyboard(bool fullRedraw = true, char highlightChar = '\0');
   void connectWiFi();
 
   void handleTouch(int idx);
+  void handleTouchPoint();
 };
 
 #endif

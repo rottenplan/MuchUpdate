@@ -36,8 +36,7 @@ void HistoryScreen::onShow() {
   tft->drawString("HISTORY", SCREEN_WIDTH / 2, 28);
 
   // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30, SCREEN_HEIGHT - 20, TFT_BLUE);
 
   drawMenu();
 }
@@ -150,8 +149,8 @@ void HistoryScreen::update() {
       int tx = _touchStartX;
       int ty = _touchStartY;
 
-      // 1. Back button (Standard Bottom Left Area)
-      if (tx < 80 && ty > SCREEN_HEIGHT - 60) {
+      // 1. Back button (Standardized Bottom Left Area)
+      if (tx < 80 && ty > 240) {
         if (_currentMode == MODE_MENU) {
           _ui->switchScreen(SCREEN_MENU);
           return;
@@ -643,8 +642,7 @@ void HistoryScreen::drawOptions() {
   // Header
   tft->drawFastHLine(0, 20, SCREEN_WIDTH, TFT_WHITE);
   // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30, SCREEN_HEIGHT - 20, TFT_BLUE);
   tft->setTextColor(TFT_WHITE, TFT_BLACK);
   tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
@@ -749,8 +747,7 @@ void HistoryScreen::drawViewData() {
     // 0-60
     tft->fillRoundRect(10, startY, boxW, boxH, 8, 0x18E3);
     // Back Button (Blue Triangle)
-    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                      SCREEN_HEIGHT - 19, TFT_BLUE);
+    tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30, SCREEN_HEIGHT - 20, TFT_BLUE);
     tft->setTextColor(TFT_SILVER, 0x18E3);
     tft->setTextDatum(TL_DATUM);
     tft->drawString("0-60 KPH", 15, startY + 5);

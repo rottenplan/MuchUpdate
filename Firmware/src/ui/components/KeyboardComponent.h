@@ -14,7 +14,8 @@ public:
     char value;
   };
 
-  void draw(TFT_eSPI *tft, int startY, bool isUppercase);
+  void draw(TFT_eSPI *tft, int startY, bool isUppercase,
+            char highlightChar = '\0');
   KeyResult handleTouch(int x, int y, int startY);
 
 private:

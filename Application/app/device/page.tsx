@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Wifi, Upload, Download, Settings, HardDrive, Cpu, Globe, Gauge, Save, Zap } from 'lucide-react';
+import { Wifi, Upload, Download, Settings, HardDrive, Cpu, Globe, Gauge, Save, Zap, FileText, Activity, Scaling } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 
@@ -191,6 +191,63 @@ export default function DevicePage() {
             <Save className="w-4 h-4" />
             SAVE SETTINGS
           </button>
+        </div>
+
+        {/* UTILITY - Mirroring Firmware */}
+        <div className="carbon-bg border border-border-color rounded-xl p-6">
+          <h2 className="text-lg font-racing text-foreground mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-highlight" />
+            UTILITY & MAINTENANCE
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* SD Card Health */}
+            <div className="bg-background-secondary/50 border border-border-color rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <HardDrive className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-racing">SD CARD HEALTH</span>
+                </div>
+                <p className="text-text-secondary text-xs mb-4">Run a read/write benchmark to verify SD card integrity.</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-data text-highlight">STATUS: READY</span>
+                <button className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-[10px] font-racing transition">RUN TEST</button>
+              </div>
+            </div>
+
+            {/* G-Force Calibration */}
+            <div className="bg-background-secondary/50 border border-border-color rounded-xl p-4 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Scaling className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-racing">G-FORCE CALIB</span>
+                </div>
+                <p className="text-text-secondary text-xs mb-4">Calibrate the accelerometer on a perfectly level surface.</p>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-data text-text-secondary">LAST: 2024-11-20</span>
+                <button className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-[10px] font-racing transition">CALIBRATE</button>
+              </div>
+            </div>
+
+            {/* GPS Debug Log */}
+            <div className="md:col-span-2 bg-background-secondary/50 border border-border-color rounded-xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm font-racing">GPS DEBUG LOG</div>
+                  <p className="text-text-secondary text-[10px]">Record raw NMEA data to SD card for troubleshooting.</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* Engine Management */}

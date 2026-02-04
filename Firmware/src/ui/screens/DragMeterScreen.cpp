@@ -3,6 +3,7 @@
 #include "../../core/SessionManager.h"
 #include "../fonts/Org_01.h"
 #include <Preferences.h>
+#include <TFT_eSPI.h>
 
 extern GPSManager gpsManager;
 extern SessionManager sessionManager;
@@ -88,36 +89,30 @@ void DragMeterScreen::update() {
     if (millis() - lastDragTouch > 200) {
       lastDragTouch = millis();
 
-      // 1. Tombol Kembali (Bottom Left)
-      if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-        static unsigned long lastBackTap = 0;
-        if (millis() - lastBackTap < 500) {
-          lastBackTap = 0;
-          if (_state == STATE_MENU) {
-            _ui->switchScreen(SCREEN_MENU);
-          } else if (_state == STATE_DRAG_MODE_MENU) {
-            _state = STATE_MENU;
-            _selectedDragModeIdx = -1; // Reset selection
-            _ui->getTft()->fillScreen(COLOR_BG);
-            drawDashboardStatic(true);
-          } else if (_state == STATE_PREDICTIVE_MENU) {
-            _state = STATE_MENU;
-            _selectedPredictiveIdx = -1;
-            _ui->getTft()->fillScreen(COLOR_BG);
-            drawDashboardStatic(true);
-          } else if (_state == STATE_SUMMARY_VIEW) {
-            _state = STATE_MENU;
-            _ui->getTft()->fillScreen(COLOR_BG);
-            drawDashboardStatic(true);
-          } else {
-            // If in running mode, go back to menu
-            _state = STATE_MENU;
-            _ui->setTitle("DRAG METER");
-            _ui->getTft()->fillScreen(COLOR_BG);
-            drawDashboardStatic(true);
-          }
+      // 1. Tombol Kembali (Bottom Left) - Expanded hit area (100x80)
+      if (p.x < 80 && p.y > 240) {
+        if (_state == STATE_MENU) {
+          _ui->switchScreen(SCREEN_MENU);
+        } else if (_state == STATE_DRAG_MODE_MENU) {
+          _state = STATE_MENU;
+          _selectedDragModeIdx = -1; // Reset selection
+          _ui->getTft()->fillScreen(COLOR_BG);
+          drawDashboardStatic(true);
+        } else if (_state == STATE_PREDICTIVE_MENU) {
+          _state = STATE_MENU;
+          _selectedPredictiveIdx = -1;
+          _ui->getTft()->fillScreen(COLOR_BG);
+          drawDashboardStatic(true);
+        } else if (_state == STATE_SUMMARY_VIEW) {
+          _state = STATE_MENU;
+          _ui->getTft()->fillScreen(COLOR_BG);
+          drawDashboardStatic(true);
         } else {
-          lastBackTap = millis();
+          // If in running mode, go back to menu
+          _state = STATE_MENU;
+          _ui->setTitle("DRAG METER");
+          _ui->getTft()->fillScreen(COLOR_BG);
+          drawDashboardStatic(true);
         }
         return;
       }
@@ -125,9 +120,9 @@ void DragMeterScreen::update() {
       // 2. Menu Logic
       if (_state == STATE_MENU) {
         int startY = 60;
-        int btnHeight = 55;
+        int btnHeight = 45; // Match drawMenu
         int btnWidth = 360;
-        int gap = 10;
+        int gap = 8; // Match drawMenu
         int x = (SCREEN_WIDTH - btnWidth) / 2;
 
         // Check if X is within button width (centered)
@@ -163,9 +158,9 @@ void DragMeterScreen::update() {
       } else if (_state == STATE_DRAG_MODE_MENU) {
         // Drag Mode Menu Logic (Similar to Main Menu)
         int startY = 60;
-        int btnHeight = 55;
+        int btnHeight = 50; // Match drawDragModeMenu
         int btnWidth = 360;
-        int gap = 10;
+        int gap = 12; // Match drawDragModeMenu
         int x = (SCREEN_WIDTH - btnWidth) / 2;
 
         if (p.x > x && p.x < x + btnWidth) {
@@ -217,9 +212,9 @@ void DragMeterScreen::update() {
   if (_state == STATE_PREDICTIVE_MENU) {
     int touchedIdx = -1;
     int startY = 60;
-    int btnHeight = 55;
+    int btnHeight = 50; // Match drawPredictiveMenu
     int btnWidth = 360;
-    int gap = 10;
+    int gap = 12; // Match drawPredictiveMenu
     int x = (SCREEN_WIDTH - btnWidth) / 2;
 
     for (int i = 0; i < _predictiveItems.size(); i++) {
@@ -252,26 +247,13 @@ void DragMeterScreen::update() {
   if (_state == STATE_RUNNING) {
     if (_runState == RUN_WAITING) {
       checkStartCondition();
-
-      // Check for Tree Button (Bottom Right)
-      if (p.x != -1 && p.x > SCREEN_WIDTH - 60 && p.y > SCREEN_HEIGHT - 60) {
-        if (millis() - lastDragTouch > 500) { // Debounce
-          lastDragTouch = millis();
-          startChristmasTree();
-        }
-      }
+      // Tree button removed - countdown is now automatic on entry
     } else if (_runState == RUN_COUNTDOWN) {
-      // Christmas Tree Logic
-      unsigned long elapsed = millis() - _startTime;
-      if (elapsed >= _treeInterval) {
-        // GO!
-        _runState = RUN_RUNNING;
-        _runStartTime = millis();                             // Start timer
-        _ui->getTft()->fillScreen(_ui->getBackgroundColor()); // Clear tree
-        drawDashboardStatic(true);
-      } else {
-        drawChristmasTreeOverlay();
-      }
+      // Christmas Tree Logic reverted/removed
+      _runState = RUN_RUNNING;
+      _runStartTime = millis();
+      _ui->getTft()->fillScreen(_ui->getBackgroundColor());
+      drawDashboardStatic(true);
     } else if (_runState == RUN_RUNNING) {
       checkStopCondition();
       updateDisciplines();
@@ -549,35 +531,37 @@ void DragMeterScreen::updateDisciplines() {
 void DragMeterScreen::startChristmasTree() {
   _runState = RUN_COUNTDOWN;
   _startTime = millis();
+  _treeInterval = 11000; // 10 down to 0 (11 seconds)
   _ui->getTft()->fillScreen(_ui->getBackgroundColor());
-  // Draw Tree Background
 }
 
 void DragMeterScreen::drawChristmasTreeOverlay() {
-  // Simple Lights Logic
   TFT_eSPI *tft = _ui->getTft();
   unsigned long elapsed = millis() - _startTime;
-  int phase = elapsed / (_treeInterval / 4); // 4 phases: Yellow 1, 2, 3, Green
 
-  int cx = SCREEN_WIDTH / 2;
-  int cy = SCREEN_HEIGHT / 2;
+  // 11 stages: 10 down to 0
+  int currentCount = 10 - (elapsed / 1000);
+  if (currentCount < 0)
+    currentCount = 0;
 
-  // Draw Traffic Light
-  // Pre-Stage (White)
-  tft->fillCircle(cx, cy - 60, 20, _ui->getTextColor());
+  static int lastCount = -1;
+  if (currentCount != lastCount) {
+    lastCount = currentCount;
+    tft->fillScreen(_ui->getBackgroundColor());
 
-  // Stage (White)
-  tft->fillCircle(cx, cy - 20, 20, _ui->getTextColor());
+    tft->setTextDatum(MC_DATUM);
+    tft->setTextColor(TFT_YELLOW, _ui->getBackgroundColor());
+    tft->setTextFont(7); // Big Font
+    tft->setTextSize(3); // Even bigger
 
-  // Yellows
-  if (phase >= 1)
-    tft->fillCircle(cx, cy + 20, 20, TFT_YELLOW);
-  if (phase >= 2)
-    tft->fillCircle(cx, cy + 60, 20, TFT_YELLOW);
-  if (phase >= 3)
-    tft->fillCircle(cx, cy + 100, 20, TFT_YELLOW);
+    tft->drawString(String(currentCount), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2);
 
-  // Green (Handled by state switch, but last frame)
+    // Subtitle
+    tft->setTextFont(4);
+    tft->setTextSize(1);
+    tft->setTextColor(TFT_WHITE, _ui->getBackgroundColor());
+    tft->drawString("GET READY", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 100);
+  }
 
   // --- FONT SAFETY ---
   tft->setTextSize(1);
@@ -711,7 +695,8 @@ void DragMeterScreen::drawDashboardStatic(bool forceStatusBar) {
 
     // --- BOTTOM AREA (Two Cards) ---
     int bottomY = 130;
-    int bottomH = SCREEN_HEIGHT - bottomY - 35; // footer margin
+    int bottomH =
+        SCREEN_HEIGHT - bottomY - 50; // Increased margin to 50 (Ends at 270)
     int splitX = SCREEN_WIDTH / 2;
 
     // List Card (Left)
@@ -743,8 +728,8 @@ void DragMeterScreen::drawDashboardStatic(bool forceStatusBar) {
   }
 
   // Back Button (Blue Triangle) - Draw LAST
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
   _ui->drawStatusBar(forceStatusBar);
 }
@@ -938,9 +923,9 @@ void DragMeterScreen::drawMenu() {
   // Removed fillScreen - handled by transition
 
   int startY = 60;
-  int btnHeight = 50;
+  int btnHeight = 45; // Reduced from 50
   int btnWidth = 360;
-  int gap = 12;
+  int gap = 8; // Reduced from 12
   int x = (SCREEN_WIDTH - btnWidth) / 2;
 
   for (int i = 0; i < _menuItems.size(); i++) {
@@ -1032,11 +1017,11 @@ void DragMeterScreen::handlePredictiveTouch(int idx) {
   // If Preductive Mode selected (idx 1), maybe we go to Summary View?
   // User didn't specify what Normal Mode does.
   // For now, let's just go to Summary View regardless, or stay in menu with
-  // selection indicator? Let's assume selecting it goes to the view for now, as
-  // that's typical. Or maybe it toggles a mode and goes back? Given the
-  // previous "Predictive" went to "Summary View", let's make "Predictive Mode"
-  // go there. "Normal Mode" might just go back to Drag Mode or similar? Let's
-  // make "Predictive Mode" go to SummaryView.
+  // selection indicator? Let's assume selecting it goes to the view for now,
+  // as that's typical. Or maybe it toggles a mode and goes back? Given the
+  // previous "Predictive" went to "Summary View", let's make "Predictive
+  // Mode" go there. "Normal Mode" might just go back to Drag Mode or similar?
+  // Let's make "Predictive Mode" go to SummaryView.
 
   if (idx == 1) { // PREDICTIVE MODE
     _state = STATE_SUMMARY_VIEW;

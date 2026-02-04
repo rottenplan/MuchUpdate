@@ -25,6 +25,7 @@ public:
   String loadHistoryIndex(); // Returns full content for processing
 
   bool deleteSession(String filename); // Delete file and update index
+  void wipeSDData();                   // Wipe sessions, tracks and history
 
   bool getSDStatus(uint64_t &total, uint64_t &used);
 

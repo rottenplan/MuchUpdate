@@ -1,5 +1,6 @@
 #include "LapTimerScreen.h"
 #include "../../core/GPSManager.h"
+#include "../../core/IMUManager.h"
 #include "../../core/SessionManager.h"
 #include "../fonts/Org_01.h"
 #include <Preferences.h>
@@ -7,6 +8,7 @@
 
 extern GPSManager gpsManager;
 extern SessionManager sessionManager;
+extern IMUManager imuManager;
 
 // Konstanta untuk Tata Letak UI
 #define STATUS_BAR_HEIGHT 20
@@ -43,6 +45,7 @@ void LapTimerScreen::onShow() {
   _maxSpeedSession = 0.0;
   _maxSpeedSessionRender = -1.0;
   _maxRpmSessionRender = 0;
+  _lastAccYRender = -999.0;
   _finishLineInside = false;
   _lastFinishCross = 0;
 
@@ -268,20 +271,9 @@ void LapTimerScreen::update() {
         return;
       _lastTouchTime = millis();
 
-      // 1. Back/Home (Bottom Left)
-      if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-        if (_menuSelectionIdx == -2) {
-          if (millis() - _lastBackTapTime < 500) {
-            _ui->switchScreen(SCREEN_MENU);
-            _lastBackTapTime = 0;
-          } else {
-            _lastBackTapTime = millis();
-          }
-        } else {
-          _menuSelectionIdx = -2;
-          drawMenu();
-          _lastBackTapTime = millis();
-        }
+      // 1. Back/Home (Bottom Left) - Expanded hit area (100x80)
+      if (p.x < 80 && p.y > 240) {
+        _ui->switchScreen(SCREEN_MENU);
         return;
       }
 
@@ -370,7 +362,8 @@ void LapTimerScreen::update() {
       _lastTouchTime = millis();
 
       // Back Button (Bottom Left)
-      if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
+      // Back Button (Bottom Left) - Expanded hit area (100x80)
+      if (p.x < 80 && p.y > 240) {
         _state = STATE_TRACK_LIST;
         _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
                                 SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
@@ -380,11 +373,11 @@ void LapTimerScreen::update() {
       }
 
       if (_createStep == 0) {
-        // SET START Button (Centered, y=200, w=220, h=50)
+        // SET START Button (Centered, y=235, w=220, h=50)
         int btnW = 220;
         int btnH = 50;
         int btnX = (SCREEN_WIDTH - btnW) / 2;
-        int btnY = 200;
+        int btnY = SCREEN_HEIGHT - 85; // 235
 
         if (p.x > btnX && p.x < btnX + btnW && p.y > btnY &&
             p.y < btnY + btnH) {
@@ -393,22 +386,23 @@ void LapTimerScreen::update() {
             _createStartLat = gpsManager.getLatitude();
             _createStartLon = gpsManager.getLongitude();
             _createStep = 1;
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    _ui->getBackgroundColor()); // Clear
+            // Clear entire screen except status bar for redraw
+            _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                      SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
             drawCreateTrack();
           } else {
             _ui->showToast("No GPS Fix!", 2000);
           }
         }
       } else if (_createStep == 1) {
-        int btnW = 200;
         int btnH = 50;
-        int btnY = 200;
+        int btnY = SCREEN_HEIGHT - 85; // 235
 
-        // Button 1: SAME AS START (Left)
-        int btn1X = 10;
-        if (p.x > btn1X && p.x < btn1X + btnW && p.y > btnY &&
+        // Button 1: SAME AS START (Left: 70, W: 180)
+        int btn1X = 70;
+        int btn1W = 180;
+
+        if (p.x > btn1X && p.x < btn1X + btn1W && p.y > btnY &&
             p.y < btnY + btnH) {
           _createFinishLat = _createStartLat;
           _createFinishLon = _createStartLon;
@@ -426,16 +420,17 @@ void LapTimerScreen::update() {
 
           // Exit
           _state = STATE_TRACK_LIST;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                  _ui->getBackgroundColor());
+          _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
           drawTrackList();
           return;
         }
 
-        // Button 2: SET FINISH (Right)
-        int btn2X = SCREEN_WIDTH - 10 - btnW;
-        if (p.x > btn2X && p.x < btn2X + btnW && p.y > btnY &&
+        // Button 2: SET FINISH (Right: 270, W: 180)
+        int btn2X = 270;
+        int btn2W = 180;
+
+        if (p.x > btn2X && p.x < btn2X + btn2W && p.y > btnY &&
             p.y < btnY + btnH) {
           if (gpsManager.isFixed()) {
             _createFinishLat = gpsManager.getLatitude();
@@ -452,9 +447,8 @@ void LapTimerScreen::update() {
             loadTracks();
 
             _state = STATE_TRACK_LIST;
-            _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                    _ui->getBackgroundColor());
+            _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                      SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
             drawTrackList();
             return;
           } else {
@@ -522,19 +516,14 @@ void LapTimerScreen::update() {
       // Title is "Nearby Tracks" at x=10. Back behavior?
       // User didn't specify Back on List, but implied menu access.
       // Let's keep Back check on left just in case < 60x60
-      // 1. Back Arrow (Bottom Left)
-      if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-        if (millis() - _lastBackTapTime < 500) {
-          _state = STATE_MENU;
-          _listScroll = 0; // Reset scroll
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
-          drawMenu();
-          _ui->drawStatusBar();
-          _lastBackTapTime = 0;
-        } else {
-          _lastBackTapTime = millis();
-        }
+      // 1. Back Arrow (Bottom Left) - Expanded hit area (100x80)
+      if (p.x < 80 && p.y > 240) {
+        _state = STATE_MENU;
+        _listScroll = 0; // Reset scroll
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+        drawMenu();
+        _ui->drawStatusBar();
         return;
       }
 
@@ -582,9 +571,12 @@ void LapTimerScreen::update() {
       if (p.y > startY && p.x < SCREEN_WIDTH - 60) {
         int relativeIdx = (p.y - startY) / (itemH + gap);
         int actualIdx = relativeIdx + _listScroll;
-        if (actualIdx >= 0 && actualIdx < _tracks.size() && relativeIdx < 4) {
+        // Limit to 3 items to avoid back button area
+        if (actualIdx >= 0 && actualIdx < _tracks.size() && relativeIdx < 3) {
           _selectedTrackIdx = actualIdx;
           _state = STATE_TRACK_MENU;
+          // Clear background slightly to dim or just draw popup over?
+          // For now just draw popup
           drawTrackOptionsPopup();
         }
       }
@@ -624,10 +616,6 @@ void LapTimerScreen::update() {
 
           // LOAD REFERENCE LAP FOR PREDICTIVE TIMING
           if (t.bestLap > 0) {
-            // Try to find the best lap file in history or current
-            // For now, let's assume we load the most recent session of this
-            // track or the one that provided the best lap. Logic simplified:
-            // Use the track's pathFile if it's a log format
             sessionManager.loadBestLapAsReference(t.pathFile);
           }
 
@@ -636,9 +624,8 @@ void LapTimerScreen::update() {
         } else if (idx == 1) { // Select & Edit
           // Go to Details Screen
           _state = STATE_TRACK_DETAILS;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                  _ui->getBackgroundColor());
+          _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
           drawTrackDetails();
         } else if (idx == 2) { // Invert
                                // TODO: Logic
@@ -648,9 +635,8 @@ void LapTimerScreen::update() {
           }
           // Close Popup
           _state = STATE_TRACK_LIST;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                  _ui->getBackgroundColor());
+          _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
           drawTrackList();
         } else if (idx == 4) { // Remove
           if (_selectedTrackIdx >= 0 && _selectedTrackIdx < _tracks.size()) {
@@ -659,16 +645,17 @@ void LapTimerScreen::update() {
             }
           }
           _state = STATE_TRACK_LIST;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, COLOR_BG);
+          _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                    SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
           drawTrackList();
         }
       } else {
-        // Click Outside -> Close Popup
+        // Outside Click -> Close Popup
         _state = STATE_TRACK_LIST;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                _ui->getBackgroundColor());
+        // Ideally redraw just the list area or remove popup rect?
+        // Simplest is full redraw
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
         drawTrackList();
       }
     }
@@ -679,17 +666,13 @@ void LapTimerScreen::update() {
       _lastTouchTime = millis();
 
       // 1. Back Button (Bottom-Left)
-      if (p.x < 100 && p.y > 240) {
-        if (millis() - _lastBackTapTime < 500) {
-          _state = STATE_TRACK_LIST;
-          _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                  _ui->getBackgroundColor());
-          drawTrackList();
-          _lastBackTapTime = 0;
-        } else {
-          _lastBackTapTime = millis();
-        }
+      // 1. Back Button (Bottom-Left) - Expanded hit area (100x80)
+      if (p.x < 80 && p.y > 240) {
+        _state = STATE_TRACK_LIST;
+        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
+                                _ui->getBackgroundColor());
+        drawTrackList();
         return;
       }
 
@@ -755,7 +738,8 @@ void LapTimerScreen::update() {
         }
       }
       // Cancel Button (Bottom Left)
-      if (p.x < 100 && p.y > 240) {
+      // Cancel Button (Bottom Left) - Expanded hit area (100x80)
+      if (p.x < 80 && p.y > 240) {
         _state = STATE_RECORD_TRACK;
         _recordingState = RECORD_COMPLETE;
         _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
@@ -770,12 +754,31 @@ void LapTimerScreen::update() {
         return;
       _lastTouchTime = millis();
       KeyboardComponent::KeyResult res = _keyboard.handleTouch(p.x, p.y, 110);
-      if (res.type == KeyboardComponent::KEY_OK) {
+
+      if (res.type == KeyboardComponent::KEY_CHAR) {
+        if (_renamingName.length() < 15) {
+          _renamingName += res.value;
+          drawRenameTrack(false);
+        }
+      } else if (res.type == KeyboardComponent::KEY_DEL) {
+        if (_renamingName.length() > 0) {
+          _renamingName.remove(_renamingName.length() - 1);
+          drawRenameTrack(false);
+        }
+      } else if (res.type == KeyboardComponent::KEY_SPACE) {
+        if (_renamingName.length() < 15) {
+          _renamingName += " ";
+          drawRenameTrack(false);
+        }
+      } else if (res.type == KeyboardComponent::KEY_SHIFT) {
+        _keyboardShift = !_keyboardShift;
+        drawRenameTrack(false);
+      } else if (res.type == KeyboardComponent::KEY_OK) {
         renameTrack(_selectedTrackIdx, _renamingName);
         _state = STATE_TRACK_DETAILS;
-        _ui->getTft()->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                                SCREEN_HEIGHT - STATUS_BAR_HEIGHT,
-                                _ui->getBackgroundColor());
+        // Restore background
+        _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
         drawTrackDetails();
       } else if (res.type != KeyboardComponent::KEY_NONE) {
         // Handle other keys...
@@ -1007,6 +1010,25 @@ void LapTimerScreen::update() {
         finalizeRaceSession();
         return;
       }
+      // G-FORCE CALIBRATION (Double Tap on G-Force Area)
+      // leftX = 5, midY = 50, leftW = 130
+      // Label "G-FORCE" at midY + 75.
+      // Card area approx: [5, 135] x [110, 160] (centered around midY + 85)
+      if (p.x >= 5 && p.x <= 135 && p.y >= 110 && p.y <= 160) {
+        unsigned long now = millis();
+        if (now - _lastGForceTapTime < 300) {
+          _gforceTapCount++;
+          if (_gforceTapCount >= 2) {
+            imuManager.calibrateLevel();
+            _lastAccYRender = -999.0; // Force redraw
+            _gforceTapCount = 0;
+            Serial.println("Race Screen: G-Force Calibration Triggered!");
+          }
+        } else {
+          _gforceTapCount = 1;
+        }
+        _lastGForceTapTime = now;
+      }
     }
 
     if (_finishSet)
@@ -1104,8 +1126,8 @@ void LapTimerScreen::drawMenu() {
   tft->drawString("LAP TIMER", SCREEN_WIDTH / 2, 25);
 
   // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
   // Buttons
   int startY = 60;
@@ -1188,8 +1210,8 @@ void LapTimerScreen::drawTrackList() {
   tft->drawString("SELECT TRACK", SCREEN_WIDTH / 2, headY + 8);
 
   // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
   // "New Track" Button (Top Right) -> "+" Icon style
   int btnX = SCREEN_WIDTH - 40;
@@ -1227,8 +1249,8 @@ void LapTimerScreen::drawTrackList() {
     return;
   }
 
-  // Draw Items (Limited to 4 per page)
-  int maxVisible = 4;
+  // Draw Items (Limited to 3 per page to avoid overlapping back button)
+  int maxVisible = 3;
   for (size_t i = 0; i < maxVisible; i++) {
     size_t trackIdx = i + _listScroll;
     if (trackIdx >= _tracks.size())
@@ -1339,8 +1361,8 @@ void LapTimerScreen::drawTrackDetails() {
   tft->drawString("TRACK DETAILS", SCREEN_WIDTH / 2, headY + headH / 2 + 1);
 
   // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
   // --- LAYOUT ---
   int margin = 15;
@@ -1443,8 +1465,8 @@ void LapTimerScreen::drawRecordTrackStatic() {
   tft->drawString("TRACK RECORDER", SCREEN_WIDTH / 2, headY + 8);
 
   // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
   _ui->drawStatusBar();
 
@@ -1487,10 +1509,6 @@ void LapTimerScreen::drawRecordTrack() {
     tft->setFreeFont(&Org_01);
     tft->setTextSize(2);
     tft->drawString("TRACK RECORDER", SCREEN_WIDTH / 2, headY + 8);
-
-    // Back Button (Blue Triangle)
-    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                      SCREEN_HEIGHT - 19, TFT_BLUE);
   }
 
   // --- 2. GPS STATUS (Premium Card Style) ---
@@ -1735,6 +1753,10 @@ void LapTimerScreen::drawRecordTrack() {
       tft->drawString(stats, SCREEN_WIDTH / 2, gridY + 35);
     }
   }
+
+  // Back Button (Blue Triangle) - Always draw over updates
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 }
 
 void LapTimerScreen::drawNoGPS() {
@@ -2154,6 +2176,18 @@ void LapTimerScreen::drawRacing() {
     tft->drawString(String(sats), 5 + 10, midY + 142);
     _lastSats = sats;
   }
+  // G-Force update
+  float accY = imuManager.getAccY();
+  if (abs(accY - _lastAccYRender) > 0.05) {
+    tft->setTextColor(TFT_WHITE, cardBg);
+    tft->setTextFont(4);
+    tft->setTextDatum(TL_DATUM);
+    tft->setTextPadding(sidePad);
+    char gBuf[16];
+    sprintf(gBuf, "%.2fG", accY);
+    tft->drawString(String(gBuf), 5 + 10, midY + 92);
+    _lastAccYRender = accY;
+  }
 
   // --- 4. LAP TIMES (Right Column) ---
   // LAST LAP
@@ -2470,108 +2504,119 @@ void LapTimerScreen::drawCreateTrack() {
   TFT_eSPI *tft = _ui->getTft();
   extern GPSManager gpsManager;
 
-  // 1. Background & Header
-  tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
+  // 1. Background & Status Bar
+  _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                            SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
+  _ui->drawStatusBar(true);
 
-  // Status Bar Separator Line
-  tft->drawFastHLine(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH, COLOR_SECONDARY);
+  // 2. Header
+  int headY = STATUS_BAR_HEIGHT + 10;
+  tft->drawFastHLine(0, headY + 30, SCREEN_WIDTH, COLOR_SECONDARY);
 
-  // Title Box (Premium Style)
-  int headW = 200;
-  int headH = 34;
-  int headX = (SCREEN_WIDTH - headW) / 2;
-  int headY = STATUS_BAR_HEIGHT + 15;
-  tft->fillRoundRect(headX, headY, headW, headH, 6, 0x10A2); // Slate
-  tft->drawRoundRect(headX, headY, headW, headH, 6, TFT_SILVER);
-
-  tft->setTextDatum(MC_DATUM);
+  tft->setTextDatum(TC_DATUM);
   tft->setFreeFont(&Org_01);
   tft->setTextSize(2);
-  tft->setTextColor(TFT_WHITE, 0x10A2);
-  tft->drawString("NEW TRACK", SCREEN_WIDTH / 2, headY + headH / 2 + 1);
+  tft->setTextColor(TFT_WHITE, TFT_BLACK); // Transparent bg on carbon
+  tft->drawString("NEW TRACK", SCREEN_WIDTH / 2, headY + 5);
 
   // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
-  // 2. Info Cards (Redesigned)
+  // 3. Main Content Area
+  int contentY = headY + 45;
+
+  // Step Indicator (Top Center)
+  tft->setTextDatum(TC_DATUM);
+  tft->setTextFont(1);
+  tft->setTextSize(1);
+  tft->setTextColor(TFT_SILVER);
+  String stepStr = "STEP " + String(_createStep + 1) + "/2";
+  tft->drawString(stepStr, SCREEN_WIDTH / 2, contentY);
+
+  // Instruction Card
   int cardX = 20;
-  int cardY = headY + headH + 15;
+  int cardY = contentY + 15;
   int cardW = SCREEN_WIDTH - 40;
-  int cardH = 95;
+  int cardH = 60;
 
   tft->fillRoundRect(cardX, cardY, cardW, cardH, 8, 0x18E3); // Charcoal
   tft->drawRoundRect(cardX, cardY, cardW, cardH, 8, TFT_DARKGREY);
 
-  // Step Indicator
-  tft->setTextDatum(TL_DATUM);
-  tft->setTextColor(TFT_SILVER, 0x18E3);
-  tft->setFreeFont(&Org_01);
-  tft->setTextSize(1);
-  String stepStr = "STEP " + String(_createStep + 1) + " OF 2";
-  tft->drawString(stepStr, cardX + 15, cardY + 12);
-
-  // Header Context (e.g. GPS Status)
-  bool fixed = gpsManager.isFixed();
-  uint16_t fixColor = fixed ? TFT_GREEN : TFT_RED;
-  tft->setTextDatum(TR_DATUM);
-  tft->setTextColor(fixColor, 0x18E3);
-  tft->drawString(fixed ? "GPS: FIXED" : "GPS: NO FIX", cardX + cardW - 15,
-                  cardY + 12);
-
-  // Instruction Message
-  tft->setTextDatum(MC_DATUM);
-  tft->setTextFont(2);
-  tft->setTextSize(1);
-  tft->setTextColor(TFT_WHITE, 0x18E3);
-
   String instr = "";
   if (_createStep == 0)
-    instr = "Go to the Start Line";
+    instr = "Go to START Line";
   else if (_createStep == 1)
-    instr = "Go to the Finish Line";
+    instr = "Go to FINISH Line";
   else
-    instr = "SAVING TRACK...";
+    instr = "SAVING...";
 
-  tft->drawString(instr, SCREEN_WIDTH / 2, cardY + 45);
+  tft->setTextDatum(MC_DATUM);
+  tft->setFreeFont(&Org_01);
+  tft->setTextSize(2);
+  tft->setTextColor(TFT_WHITE, 0x18E3);
+  tft->drawString(instr, SCREEN_WIDTH / 2, cardY + cardH / 2 + 3);
 
-  // Coordinates Display
-  if (_createStep < 2) {
-    tft->setTextFont(1);
-    tft->setTextColor(fixed ? TFT_SKYBLUE : TFT_SILVER, 0x18E3);
-    char coordBuf[64];
-    sprintf(coordBuf, "LAT: %.6f  LON: %.6f", gpsManager.getLatitude(),
+  // GPS Data Box
+  int gpsY = cardY + cardH + 15;
+  bool fixed = gpsManager.isFixed();
+
+  // Coordinates
+  tft->setTextFont(2);
+  tft->setTextSize(1);
+  tft->setTextColor(fixed ? TFT_CYAN : TFT_RED, COLOR_BG); // On Carbon
+
+  char coordBuf[64];
+  if (fixed) {
+    sprintf(coordBuf, "LAT: %.6f   LON: %.6f", gpsManager.getLatitude(),
             gpsManager.getLongitude());
-    tft->drawString(coordBuf, SCREEN_WIDTH / 2, cardY + 75);
+  } else {
+    sprintf(coordBuf, "WAITING FOR GPS FIX...");
   }
+  tft->drawString(coordBuf, SCREEN_WIDTH / 2, gpsY + 10);
 
-  // 3. Action Buttons (Premium Styling)
+  // 4. Action Button
+  int btnW = 220;
   int btnH = 50;
-  int btnY = cardY + cardH + 20;
+  int btnX = (SCREEN_WIDTH - btnW) / 2;
+  int btnY = SCREEN_HEIGHT - 85; // Raised to 235 to clearly clear back button
 
-  if (_createStep == 0) {
-    int btnW = 220;
-    int btnX = (SCREEN_WIDTH - btnW) / 2;
-    uint16_t btnColor = fixed ? TFT_GREEN : 0x4208; // Dim green if no fix
-    tft->fillRoundRect(btnX, btnY, btnW, btnH, 8, btnColor);
-    tft->setTextColor(TFT_BLACK, btnColor);
-    tft->setTextFont(2);
-    tft->drawString("SET START LINE", btnX + btnW / 2, btnY + btnH / 2 + 1);
-  } else if (_createStep == 1) {
-    int btnW = 190;
-    // Same as Start
-    tft->fillRoundRect(30, btnY, btnW, btnH, 8, TFT_CYAN);
-    tft->setTextColor(TFT_BLACK, TFT_CYAN);
-    tft->setTextFont(2);
-    tft->drawString("SAME AS START", 30 + btnW / 2, btnY + btnH / 2 + 1);
+  // Check valid fix before enabling button visual
+  uint16_t btnColor = fixed ? TFT_GREEN : 0x4208; // Bright Green or Dim
+  uint16_t txtColor = TFT_BLACK;
 
-    // Set Finish
-    uint16_t btnColor = fixed ? TFT_GREEN : 0x4208;
-    tft->fillRoundRect(SCREEN_WIDTH - 30 - btnW, btnY, btnW, btnH, 8, btnColor);
-    tft->setTextColor(TFT_BLACK, btnColor);
-    tft->drawString("SET FINISH", SCREEN_WIDTH - 30 - btnW / 2,
-                    btnY + btnH / 2 + 1);
+  if (_createStep < 2) {
+    if (_createStep == 1) {
+      // Two buttons for Finish: "SAME AS START" | "SET FINISH"
+      // Shift Right to avoid Back Button (X < 60)
+
+      // Button 1: SAME AS START (Left) - Moved to X=70
+      // W=180 to fit
+      int smallBtnW = 180;
+
+      tft->fillRoundRect(70, btnY, smallBtnW, btnH, 8, TFT_CYAN);
+      tft->setTextColor(TFT_BLACK, TFT_CYAN);
+      tft->setFreeFont(&Org_01);
+      tft->setTextSize(1);
+      tft->setTextDatum(MC_DATUM);
+      tft->drawString("SAME AS START", 70 + smallBtnW / 2, btnY + btnH / 2);
+
+      // Button 2: SET FINISH (Right) - Moved to X=270
+      tft->fillRoundRect(270, btnY, smallBtnW, btnH, 8, btnColor);
+      tft->setTextColor(TFT_BLACK, btnColor);
+      tft->drawString("SET FINISH", 270 + smallBtnW / 2, btnY + btnH / 2);
+    } else {
+      // Step 0: Just Set Start (Centered)
+      tft->fillRoundRect(btnX, btnY, btnW, btnH, 8, btnColor);
+      tft->drawRoundRect(btnX, btnY, btnW, btnH, 8, TFT_WHITE);
+
+      tft->setTextColor(txtColor, btnColor);
+      tft->setFreeFont(&Org_01);
+      tft->setTextSize(1); // Scale up
+      tft->setTextDatum(MC_DATUM);
+      String btnLabel = "SET START LINE";
+      tft->drawString(btnLabel, btnX + btnW / 2, btnY + btnH / 2);
+    }
   }
 
   _ui->drawStatusBar();
@@ -2676,8 +2721,8 @@ void LapTimerScreen::drawRenameTrack(bool force) {
   bool fullRedraw = force || (lastRenamingName == "");
 
   if (fullRedraw) {
-    tft->fillRect(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
-                  SCREEN_HEIGHT - STATUS_BAR_HEIGHT, TFT_BLACK);
+    _ui->drawCarbonBackground(0, STATUS_BAR_HEIGHT, SCREEN_WIDTH,
+                              SCREEN_HEIGHT - STATUS_BAR_HEIGHT);
 
     // Header
     tft->drawFastHLine(0, 20, SCREEN_WIDTH, COLOR_SECONDARY);

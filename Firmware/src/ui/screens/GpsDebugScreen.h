@@ -15,7 +15,8 @@ public:
 private:
   UIManager *_ui;
   unsigned long _lastUpdate = 0;
-  void drawDebugInfo();
+  void drawDebugStatic();
+  void drawDebugDynamic();
 };
 
 #endif

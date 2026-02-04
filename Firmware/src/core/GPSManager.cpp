@@ -90,10 +90,8 @@ void GPSManager::begin() {
   // OR if set to 0 (Legacy Default), assuming User is in Indonesia and hasn't
   // configured it.
   int storedOffset = prefs.getInt("utc_offset", -100);
-  if (storedOffset == -100 || storedOffset == 0) {
+  if (storedOffset == -100) {
     _utcOffset = 7; // Default to WIB (Indonesia)
-    // Optional: We could save this back to prefs to make it permanent
-    // prefs.putInt("utc_offset", 7);
   } else {
     _utcOffset = storedOffset;
   }
@@ -229,6 +227,7 @@ void GPSManager::update() {
       _sysDay = _gps.date.day();
       _sysMonth = _gps.date.month();
       _sysYear = _gps.date.year();
+      _lastTick = now; // Prevent double-tick immediately after sync
       lastGpsSync = now;
     }
   }
@@ -241,7 +240,12 @@ void GPSManager::update() {
     if (_hasLastPos) {
       double dist = distanceBetween(_lastLat, _lastLng, lat, lng);
       // Filter out jitter (e.g. static movements < 2m)
-      if (dist > 2.0 && dist < 1000.0) { // < 1km jump is reasonable for 1Hz
+      // ALSO: Only increment distance if we have a high quality fix and are
+      // moving above deadzone speed
+      bool highQualityFix = (_fixType >= 3 && _satelliteCount >= GPS_MIN_SATS &&
+                             _hdop <= GPS_MAX_PDOP);
+      if (dist > 2.0 && dist < 1000.0 && _currentSpeed >= GPS_SPEED_DEADZONE &&
+          highQualityFix) {
         _totalDistance += dist;
       }
     }
@@ -355,8 +359,22 @@ double GPSManager::getLongitude() {
 }
 
 float GPSManager::getSpeedKmph() {
+  // Check if we have a high-quality 3D/GNSS+DR fix and enough satellites
+  // This helps prevent "ghost" speed readings when the device is stationary or
+  // signal is weak
+  if (_fixType < 3 || _satelliteCount < GPS_MIN_SATS || _hdop > GPS_MAX_PDOP) {
+    return 0.0f;
+  }
+
   // Use UBX parsed speed (already in km/h)
-  return _currentSpeed;
+  float speed = _currentSpeed;
+
+  // Apply deadzone threshold to filter out noise when stationary
+  if (speed < GPS_SPEED_DEADZONE) {
+    return 0.0f;
+  }
+
+  return speed;
 
   // Priority 2: Calculate speed from position changes
   if (_gps.location.isValid() && _gps.location.isUpdated()) {
@@ -1135,8 +1153,9 @@ void GPSManager::parseUBXNavPvt() {
     return; // Invalid UBX-NAV-PVT message
 
   // Extract fix type (offset 20)
-  uint8_t fixType = _ubxPayload[20];
-  _hasValidFix = (fixType == 0x02 || fixType == 0x03); // 2D or 3D fix
+  _fixType = _ubxPayload[20];
+  _hasValidFix = (_fixType == 0x02 || _fixType == 0x03 ||
+                  _fixType == 0x04); // 2D, 3D, or GNSS+DR
 
   // Extract satellite count (offset 23)
   _satelliteCount = _ubxPayload[23];
@@ -1187,6 +1206,8 @@ void GPSManager::parseUBXNavPvt() {
   // Update counters
   _updatesCount++;
   _lastUpdateTime = millis();
+  _lastTick =
+      _lastUpdateTime; // Prevent double-tick immediately after binary sync
 }
 
 bool GPSManager::detectBaudRate() {

@@ -1,24 +1,20 @@
 #include "KeyboardComponent.h"
 
 // Helper to calculate key width dynamically
-int getDynamicKeyWidth() {
-  // Max keys in a row is 10 (1234567890 or QWERTYUIOP)
-  // We want some margin on sides, say 2px gap between keys?
-  // 10 keys * W = SCREEN_WIDTH - margin
-  // Let's use entire width minus 10px margin
-  return (SCREEN_WIDTH - 20) / 10;
-}
+int getDynamicKeyWidth() { return (SCREEN_WIDTH - 20) / 10; }
 
-void KeyboardComponent::draw(TFT_eSPI *tft, int startY, bool isUppercase) {
+void KeyboardComponent::draw(TFT_eSPI *tft, int startY, bool isUppercase,
+                             char highlightChar) {
   tft->setTextFont(1);
   tft->setTextSize(1);
 
   int keyW = getDynamicKeyWidth();
-  // Adjust height slightly larger for easier touch
   int keyH = 35;
 
   // QWERTY keyboard rows
-  String rows[] = {"1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"};
+  // Row 3: SHFT (col 0)
+  String rows[] = {"1234567890", "QWERTYUIOP", "ASDFGHJKL",
+                   " zxcvbnm"}; // Removed ENT placeholder
 
   for (int row = 0; row < 4; row++) {
     String keys = rows[row];
@@ -30,81 +26,97 @@ void KeyboardComponent::draw(TFT_eSPI *tft, int startY, bool isUppercase) {
       int x = startX + (col * keyW);
       int ky = startY + (row * keyH);
 
-      // Draw Key Box
-      tft->drawRect(x, ky, keyW, keyH, TFT_WHITE);
-      tft->setTextColor(TFT_WHITE, COLOR_BG);
-      tft->setTextDatum(MC_DATUM);
-
       char c = keys[col];
+      bool isHighlighted = (c == highlightChar);
+
+      // Special highlighting for SHFT in Row 3
+      if (row == 3) {
+        if (col == 0)
+          isHighlighted = (highlightChar == 1);
+      }
+
       if (!isUppercase && c >= 'A' && c <= 'Z') {
         c = c + ('a' - 'A');
+        if (highlightChar >= 'a' && highlightChar <= 'z') {
+          isHighlighted = (c == highlightChar);
+        }
       }
-      // Draw Character
-      // Center in the box
-      tft->drawString(String(c), x + keyW / 2, ky + keyH / 2);
+
+      uint16_t boxColor = isHighlighted ? COLOR_HIGHLIGHT : COLOR_BG;
+      uint16_t txtColor = isHighlighted ? TFT_BLACK : TFT_WHITE;
+
+      if (isHighlighted) {
+        tft->fillRect(x, ky, keyW, keyH, boxColor);
+      } else {
+        tft->drawRect(x, ky, keyW, keyH, TFT_WHITE);
+        tft->fillRect(x + 1, ky + 1, keyW - 2, keyH - 2, COLOR_BG);
+      }
+
+      tft->setTextColor(txtColor, boxColor);
+      tft->setTextDatum(MC_DATUM);
+
+      if (row == 3 && col == 0) {
+        tft->drawString("SHFT", x + keyW / 2, ky + keyH / 2);
+      } else {
+        tft->drawString(String(c), x + keyW / 2, ky + keyH / 2);
+      }
     }
   }
 
-  // Special keys (Row 4)
+  // Row 4 (Special): DEL, SPACE, ENT
   int specialY = startY + (4 * keyH);
+  int availW = SCREEN_WIDTH - 20;
 
-  // Distribute special keys across full width
-  // Total available width ~ SCREEN_WIDTH
-  // Ratios: SHIFT(1.5), DEL(1.5), SPACE(4), OK(1.5) -> Total 8.5 units?
-  // Let's simplify: 4 buttons.
-  // Shift (15%), Del (15%), Space (50%), Ok (20%)
+  // Layout: [DEL 20%] [SPACE 55%] [ENT 25%] - Gaps handled
+  int gap = 4;
+  int delW = (availW - 2 * gap) * 0.20;
+  int entW = (availW - 2 * gap) * 0.25;
+  int spaceW = availW - delW - entW - 2 * gap;
 
-  int availW = SCREEN_WIDTH - 20; // Margin
-  int shiftW = availW * 0.15;
-  int delW = availW * 0.15;
-  int okW = availW * 0.20;
-  int spaceW = availW - shiftW - delW - okW - (3 * GAP); // Remainder
-
-  int startX = 10; // Left Margin
-
-  int shiftX = startX;
-  int delX = shiftX + shiftW + GAP;
-  int spaceX = delX + delW + GAP;
-  int okX = spaceX + spaceW + GAP;
-
-  // SHIFT
-  uint16_t shiftColor = isUppercase ? COLOR_HIGHLIGHT : COLOR_BG;
-  uint16_t shiftTxtColor = isUppercase ? TFT_BLACK : TFT_WHITE;
-  tft->fillRect(shiftX, specialY, shiftW, keyH, shiftColor);
-  if (!isUppercase)
-    tft->drawRect(shiftX, specialY, shiftW, keyH, TFT_WHITE);
-  tft->setTextColor(shiftTxtColor, shiftColor);
-  tft->setTextDatum(MC_DATUM);
-  tft->drawString("SHFT", shiftX + shiftW / 2, specialY + keyH / 2);
+  int startX_row4 = 10;
+  int delX = startX_row4;
+  int spaceX = delX + delW + gap;
+  int entX = spaceX + spaceW + gap;
 
   // DEL
+  bool delHigh = (highlightChar == 2);
+  uint16_t delCol = delHigh ? COLOR_HIGHLIGHT : COLOR_BG;
+  uint16_t delTxt = delHigh ? TFT_BLACK : TFT_WHITE;
+  tft->fillRect(delX, specialY, delW, keyH, delCol);
   tft->drawRect(delX, specialY, delW, keyH, TFT_WHITE);
-  tft->setTextColor(TFT_WHITE, COLOR_BG);
+  tft->setTextColor(delTxt, delCol);
   tft->drawString("DEL", delX + delW / 2, specialY + keyH / 2);
 
   // SPACE
+  bool spaceHigh = (highlightChar == ' ');
+  uint16_t spaceCol = spaceHigh ? COLOR_HIGHLIGHT : COLOR_BG;
+  uint16_t spaceTxt = spaceHigh ? TFT_BLACK : TFT_WHITE;
+  tft->fillRect(spaceX, specialY, spaceW, keyH, spaceCol);
   tft->drawRect(spaceX, specialY, spaceW, keyH, TFT_WHITE);
+  tft->setTextColor(spaceTxt, spaceCol);
   tft->drawString("SPACE", spaceX + spaceW / 2, specialY + keyH / 2);
 
-  // OK
-  tft->fillRect(okX, specialY, okW, keyH, COLOR_PRIMARY);
-  tft->setTextColor(TFT_BLACK, COLOR_PRIMARY);
-  tft->drawString("OK", okX + okW / 2, specialY + keyH / 2);
+  // ENTER
+  bool entHigh = (highlightChar == 3);
+  uint16_t entCol = entHigh ? COLOR_HIGHLIGHT : COLOR_BG;
+  uint16_t entTxt = entHigh ? TFT_BLACK : TFT_WHITE;
+  tft->fillRect(entX, specialY, entW, keyH, entCol);
+  tft->drawRect(entX, specialY, entW, keyH, TFT_WHITE);
+  tft->setTextColor(entTxt, entCol);
+  tft->drawString("ENT", entX + entW / 2, specialY + keyH / 2);
 }
 
 KeyboardComponent::KeyResult KeyboardComponent::handleTouch(int x, int y,
                                                             int startY) {
   KeyResult result = {KEY_NONE, 0};
-
   int keyW = getDynamicKeyWidth();
-  int keyH = 35; // Match draw height
-
+  int keyH = 35;
   int keyY = y - startY;
   if (keyY < 0)
     return result;
 
   int row = keyY / keyH;
-  String rows[] = {"1234567890", "QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"};
+  String rows[] = {"1234567890", "QWERTYUIOP", "ASDFGHJKL", " zxcvbnm"};
 
   if (row >= 0 && row < 4) {
     String keys = rows[row];
@@ -112,40 +124,37 @@ KeyboardComponent::KeyResult KeyboardComponent::handleTouch(int x, int y,
     int totalW = numKeys * keyW;
     int startX = (SCREEN_WIDTH - totalW) / 2;
 
-    // Check X bounds for row
     if (x < startX || x > startX + totalW)
       return result;
-
     int col = (x - startX) / keyW;
 
     if (col >= 0 && col < numKeys) {
-      result.type = KEY_CHAR;
-      result.value = keys[col];
+      if (row == 3 && col == 0)
+        result.type = KEY_SHIFT;
+      else {
+        result.type = KEY_CHAR;
+        result.value = keys[col];
+      }
     }
   } else if (row == 4) {
-    // Recalculate special key dimensions locally
     int availW = SCREEN_WIDTH - 20;
-    int shiftW = availW * 0.15;
-    int delW = availW * 0.15;
-    int okW = availW * 0.20;
-    int spaceW = availW - shiftW - delW - okW - (3 * GAP);
+    int gap = 4;
+    int delW = (availW - 2 * gap) * 0.20;
+    int entW = (availW - 2 * gap) * 0.25;
+    int spaceW = availW - delW - entW - 2 * gap;
 
-    int startX = 10;
-    int shiftX = startX;
-    int delX = shiftX + shiftW + GAP;
-    int spaceX = delX + delW + GAP;
-    int okX = spaceX + spaceW + GAP;
+    int startX_row4 = 10;
+    int delX = startX_row4;
+    int spaceX = delX + delW + gap;
+    int entX = spaceX + spaceW + gap;
 
-    if (x >= shiftX && x < shiftX + shiftW) {
-      result.type = KEY_SHIFT;
-    } else if (x >= delX && x < delX + delW) {
+    if (x >= delX && x < delX + delW) {
       result.type = KEY_DEL;
     } else if (x >= spaceX && x < spaceX + spaceW) {
       result.type = KEY_SPACE;
-    } else if (x >= okX && x < okX + okW) {
+    } else if (x >= entX && x < entX + entW) {
       result.type = KEY_OK;
     }
   }
-
   return result;
 }

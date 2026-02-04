@@ -1,16 +1,16 @@
 "use client";
 
-import { Gauge, Map, MonitorSmartphone, Menu } from "lucide-react";
+import { Zap, Map, Settings, History } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 export default function BottomNav() {
     return (
-        <div className="fixed bottom-0 left-0 right-0 carbon-bg border-t border-border-color h-16 flex items-center justify-around pb-safe z-50 backdrop-blur-md">
-            <NavItem icon={<Gauge />} label="DASHBOARD" href="/dashboard" />
+        <div className="fixed bottom-0 left-0 right-0 glass-header border-t border-white/5 h-16 flex items-center justify-around pb-safe z-50">
+            <NavItem icon={<History />} label="FEED" href="/" />
+            <NavItem icon={<Zap />} label="HUB" href="/dashboard" />
             <NavItem icon={<Map />} label="TRACKS" href="/tracks" />
-            <NavItem icon={<MonitorSmartphone />} label="DEVICES" href="/device" />
-            <NavItem icon={<Menu />} label="ACCOUNT" href="/account" />
+            <NavItem icon={<Settings />} label="SYSTEM" href="/device" />
         </div>
     );
 }

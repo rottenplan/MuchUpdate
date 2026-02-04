@@ -79,10 +79,10 @@ void RpmSensorScreen::onHide() {
 }
 
 void RpmSensorScreen::update() {
-  // 1. Back Button (Standard Bottom Left Area)
+  // 1. Back Button (Standardized 100x80)
   UIManager::TouchPoint p = _ui->getTouchPoint();
-  if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-    _ui->switchScreen(SCREEN_MENU); // Instant Switch (Single Tap)
+  if (p.x < 80 && p.y > 240) {
+    _ui->switchScreen(SCREEN_MENU);
     return;
   }
 

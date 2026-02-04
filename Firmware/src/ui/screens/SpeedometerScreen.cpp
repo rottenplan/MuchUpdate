@@ -35,16 +35,29 @@ void SpeedometerScreen::onShow() {
 void SpeedometerScreen::update() {
   // 1. Tombol Kembali
   UIManager::TouchPoint p = _ui->getTouchPoint();
-  // Back Button Area (Bottom Left)
-  if (p.x != -1 && p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-    static unsigned long lastBackTap = 0;
-    if (millis() - lastBackTap < 500) {
-      _ui->switchScreen(SCREEN_MENU);
-      lastBackTap = 0;
-    } else {
-      lastBackTap = millis();
-    }
+  // 1. Tombol Kembali (Standardized hit area 100x80)
+  if (p.x != -1 && p.x < 80 && p.y > 240) {
+    _ui->switchScreen(SCREEN_MENU);
     return;
+  }
+
+  // 2. Roll Angle Calibration (Double Tap on Card)
+  // Roll card area: startX + cardW + gap, bottomCardY
+  // Approx bounds: [170, 300] x [195, 245]
+  if (p.x >= 170 && p.x <= 300 && p.y >= 195 && p.y <= 245) {
+    unsigned long now = millis();
+    if (now - _lastTapTime < 300) { // Double tap within 300ms
+      _tapCount++;
+      if (_tapCount >= 2) {
+        imuManager.calibrateLevel();
+        _lastRoll = -999; // Force redraw
+        _tapCount = 0;
+        Serial.println("Roll Calibration Triggered!");
+      }
+    } else {
+      _tapCount = 1;
+    }
+    _lastTapTime = now;
   }
 
   // 2. Pembaruan Data GPS
@@ -195,8 +208,8 @@ void SpeedometerScreen::drawDashboard(bool force) {
 
     // --- BACK BUTTON (Blue Triangle) ---
     // Drawn at bottom so it's over everything
-    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                      SCREEN_HEIGHT - 19, TFT_BLUE);
+    tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                      SCREEN_HEIGHT - 20, TFT_BLUE);
   }
 
   // --- DYNAMIC UPDATES ---

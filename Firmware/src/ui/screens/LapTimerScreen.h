@@ -142,6 +142,11 @@ private:
   float _maxSpeedSession = 0.0;
   float _maxSpeedSessionRender = -1.0;
   unsigned long _maxRpmSessionRender = 0;
+  float _lastAccYRender = -999.0;
+
+  // Double tap detection
+  unsigned long _lastGForceTapTime = 0;
+  int _gforceTapCount = 0;
 
   // Predictive Timing
   float _currentDelta = 0.0;

@@ -114,6 +114,8 @@ private:
 
   // GPS Data (from UBX or NMEA)
   bool _hasValidFix = false;
+  uint8_t _fixType =
+      0; // 0=No fix, 1=Dead reckoning, 2=2D, 3=3D, 4=GNSS+DR, 5=Time only
   int _satelliteCount = 0;
   double _latitude = 0.0;
   double _longitude = 0.0;

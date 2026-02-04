@@ -31,8 +31,8 @@ void GpsStatusScreen::onShow() {
   // related, but let's ensure clean state here.
 
   // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
   // Log Button (Orange Label) - Bottom Right
   tft->fillRoundRect(SCREEN_WIDTH - 60, SCREEN_HEIGHT - 35, 50, 25, 4,
@@ -50,15 +50,9 @@ void GpsStatusScreen::update() {
   UIManager::TouchPoint p = _ui->getTouchPoint();
   if (p.x != -1) {
     // Back Button Area
-    // Back Button Area (Bottom Left)
-    if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-      static unsigned long lastBackTap = 0;
-      if (millis() - lastBackTap < 500) {
-        _ui->switchScreen(SCREEN_MENU);
-        lastBackTap = 0;
-      } else {
-        lastBackTap = millis();
-      }
+    // Back Button Area (Standardized 100x80)
+    if (p.x < 80 && p.y > 240) {
+      _ui->switchScreen(SCREEN_MENU);
       return;
     }
 

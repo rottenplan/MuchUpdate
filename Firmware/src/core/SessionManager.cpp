@@ -632,3 +632,44 @@ float SessionManager::getReferenceTime(float distance) {
   float ratio = (distance - p1.distance) / distDelta;
   return p1.time + (p2.time - p1.time) * ratio;
 }
+
+void SessionManager::wipeSDData() {
+  if (!SD.totalBytes())
+    return;
+
+  auto clearFolder = [](String path) {
+    File root = SD.open(path);
+    if (!root || !root.isDirectory())
+      return;
+
+    File file = root.openNextFile();
+    while (file) {
+      String fileName = file.name();
+      // Ensure path is correct for removal
+      String fullPath = path;
+      if (!fullPath.endsWith("/"))
+        fullPath += "/";
+      if (fileName.startsWith("/")) {
+        SD.remove(fileName);
+      } else {
+        SD.remove(fullPath + fileName);
+      }
+      file = root.openNextFile();
+    }
+  };
+
+  // 1. Clear contents of known data folders
+  clearFolder("/sessions");
+  clearFolder("/tracks");
+  clearFolder("/uploaded_tracks");
+
+  // 2. Remove history index & wifi details
+  if (SD.exists("/history.csv")) {
+    SD.remove("/history.csv");
+  }
+  if (SD.exists("/wifi.txt")) {
+    SD.remove("/wifi.txt");
+  }
+
+  Serial.println("SD Data Wipe Complete");
+}

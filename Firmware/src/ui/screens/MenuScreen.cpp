@@ -1,5 +1,6 @@
 #include "MenuScreen.h"
 #include "../../core/GPSManager.h"
+#include "SettingsScreen.h"
 
 // extern GPSManager gpsManager; // If needed
 
@@ -175,6 +176,7 @@ void MenuScreen::update() {
       _ui->switchScreen(SCREEN_GPS_STATUS);
       break;
     case 6:
+      SettingsScreen::startMode = SettingsScreen::MODE_MAIN;
       _ui->switchScreen(SCREEN_SETTINGS);
       break;
     case 7:

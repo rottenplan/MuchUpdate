@@ -51,15 +51,9 @@ void TimeSettingScreen::update() {
     if (millis() - lastTouch > 200) {
       lastTouch = millis();
 
-      // 1. Back Button (Standard Bottom Left Area)
-      if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-        static unsigned long lastBackTap = 0;
-        if (millis() - lastBackTap < 500) {
-          _ui->switchScreen(SCREEN_SETTINGS);
-          lastBackTap = 0;
-        } else {
-          lastBackTap = millis();
-        }
+      // 1. Back Button (Standardized Bottom Left Area - 100x80)
+      if (p.x < 80 && p.y > 240) {
+        _ui->switchScreen(SCREEN_SETTINGS);
         return;
       }
 
@@ -150,8 +144,7 @@ void TimeSettingScreen::drawScreen() {
   tft->fillRect(0, 61, SCREEN_WIDTH, SCREEN_HEIGHT - 61, COLOR_BG);
 
   // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30, SCREEN_HEIGHT - 20, TFT_BLUE);
 
   // Title
   tft->setTextColor(COLOR_TEXT, COLOR_BG);

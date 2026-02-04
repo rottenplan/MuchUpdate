@@ -1,5 +1,6 @@
 #include "WebServerScreen.h"
 #include "../fonts/Org_01.h"
+#include "SettingsScreen.h"
 
 extern WiFiManager wifiManager;
 
@@ -22,9 +23,9 @@ void WebServerScreen::onShow() {
 void WebServerScreen::drawStatic() {
   TFT_eSPI *tft = _ui->getTft();
 
-  // Back Button (Blue Triangle)
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  // Back Button (Standardized Blue Triangle)
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 
   // Instructions (Header)
   tft->setTextDatum(TC_DATUM);
@@ -84,8 +85,9 @@ void WebServerScreen::update() {
     _lastTouchTime = millis();
 
     // Standardized Back Button Touch Area (Bottom-Left)
-    if (p.x < 80 && p.y > SCREEN_HEIGHT - 60) {
-      _ui->switchScreen(SCREEN_SETTINGS); // Return to Settings
+    if (p.x < 80 && p.y > 240) {
+      SettingsScreen::startMode = SettingsScreen::MODE_WIFI_MENU;
+      _ui->switchScreen(SCREEN_SETTINGS); // Return to Settings -> WiFi/Cloud
       return;
     }
   }

@@ -5,6 +5,7 @@ IMUManager::IMUManager() : _mpu(Wire), _isConnected(false), _lastUpdate(0) {
   _angleX = _angleY = _angleZ = 0;
   _accX = _accY = _accZ = 0;
   _rollOffset = _pitchOffset = 0;
+  _accXOffset = _accYOffset = 0;
   _isEnabled = true;
 }
 
@@ -24,6 +25,8 @@ void IMUManager::begin() {
     prefs.begin("laptimer", true);
     _rollOffset = prefs.getFloat("imu_roll_off", 0.0);
     _pitchOffset = prefs.getFloat("imu_pitch_off", 0.0);
+    _accXOffset = prefs.getFloat("imu_acc_x_off", 0.0);
+    _accYOffset = prefs.getFloat("imu_acc_y_off", 0.0);
     _isEnabled = prefs.getBool("imu_enabled", true);
     prefs.end();
   } else {
@@ -45,8 +48,8 @@ void IMUManager::update() {
     _angleY = _mpu.getAngleY() - _pitchOffset;
     _angleZ = _mpu.getAngleZ();
 
-    _accX = _mpu.getAccX();
-    _accY = _mpu.getAccY();
+    _accX = _mpu.getAccX() - _accXOffset;
+    _accY = _mpu.getAccY() - _accYOffset;
     _accZ = _mpu.getAccZ();
 
     _lastUpdate = millis();
@@ -64,11 +67,16 @@ void IMUManager::calibrate() {
 void IMUManager::calibrateLevel() {
   if (_isConnected) {
     _mpu.update();
+    // Zero out angles
     _rollOffset = _mpu.getAngleX();
     _pitchOffset = _mpu.getAngleY();
+    // Zero out G-Force (assuming level surface)
+    _accXOffset = _mpu.getAccX();
+    _accYOffset = _mpu.getAccY();
+
     saveSettings();
-    Serial.printf("MPU6050: Level Calibrated. RollOff: %.2f, PitchOff: %.2f\n",
-                  _rollOffset, _pitchOffset);
+    Serial.printf("IMU: Level Calibrated. AccXOff: %.3f, AccYOff: %.3f\n",
+                  _accXOffset, _accYOffset);
   }
 }
 
@@ -77,6 +85,8 @@ void IMUManager::saveSettings() {
   prefs.begin("laptimer", false);
   prefs.putFloat("imu_roll_off", _rollOffset);
   prefs.putFloat("imu_pitch_off", _pitchOffset);
+  prefs.putFloat("imu_acc_x_off", _accXOffset);
+  prefs.putFloat("imu_acc_y_off", _accYOffset);
   prefs.putBool("imu_enabled", _isEnabled);
   prefs.end();
 }

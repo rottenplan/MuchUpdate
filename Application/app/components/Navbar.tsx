@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Gauge, Map, MonitorSmartphone, Menu, Cloud, Zap, User, Timer, LogOut } from "lucide-react";
+import { Zap, User, Timer, LogOut, History as HistoryIcon, Map as MapIcon, Settings as SettingsIcon, Gauge, Menu, MonitorSmartphone } from "lucide-react";
 
 export default function Navbar() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -25,16 +25,16 @@ export default function Navbar() {
     if (pathname === '/login') return null;
 
     return (
-        <nav className="fixed top-0 left-0 right-0 z-[9999] carbon-bg border-b border-border-color backdrop-blur-md h-16 shadow-lg">
+        <nav className="fixed top-0 left-0 right-0 z-[9999] glass-header h-16 shadow-lg">
             <div className="container mx-auto px-4 h-full">
                 <div className="flex items-center justify-between h-full">
 
                     {/* Brand */}
                     <Link href={isLoggedIn ? "/dashboard" : "/"} className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 relative flex items-center justify-center bg-background-secondary rounded-lg border border-border-color group-hover:border-primary transition">
+                        <div className="w-10 h-10 relative flex items-center justify-center bg-background-secondary rounded-lg border border-white/5 group-hover:border-primary/50 transition shadow-glow-blue/10">
                             <Zap className="w-6 h-6 text-primary" />
                         </div>
-                        <span className="text-foreground text-xl font-racing tracking-wide group-hover:text-primary transition">
+                        <span className="text-foreground text-xl font-racing tracking-[0.1em] group-hover:text-primary transition italic">
                             MUCH RACING
                         </span>
                     </Link>
@@ -42,11 +42,10 @@ export default function Navbar() {
                     {/* Desktop Navigation */}
                     {isLoggedIn && (
                         <div className="hidden md:flex items-center space-x-1">
-                            <NavLink href="/dashboard" icon={<Gauge className="w-4 h-4" />} label="DASHBOARD" isActive={pathname === '/dashboard'} />
-                            <NavLink href="/tracks" icon={<Map className="w-4 h-4" />} label="TRACKS" isActive={pathname.startsWith('/tracks')} />
-                            <NavLink href="/sessions" icon={<Timer className="w-4 h-4" />} label="SESSIONS" isActive={pathname.startsWith('/sessions')} />
-                            <NavLink href="/device" icon={<MonitorSmartphone className="w-4 h-4" />} label="DEVICES" isActive={pathname.startsWith('/device')} />
-                            <NavLink href="/account" icon={<User className="w-4 h-4" />} label="ACCOUNT" isActive={pathname === '/account'} />
+                            <NavLink href="/" icon={<HistoryIcon className="w-4 h-4" />} label="FEED" isActive={pathname === '/'} />
+                            <NavLink href="/dashboard" icon={<Zap className="w-4 h-4" />} label="HUB" isActive={pathname === '/dashboard'} />
+                            <NavLink href="/tracks" icon={<MapIcon className="w-4 h-4" />} label="TRACKS" isActive={pathname.startsWith('/tracks')} />
+                            <NavLink href="/device" icon={<SettingsIcon className="w-4 h-4" />} label="SYSTEM" isActive={pathname.startsWith('/device') || pathname.startsWith('/account')} />
                         </div>
                     )}
 
@@ -86,11 +85,10 @@ export default function Navbar() {
             {isLoggedIn && isMobileMenuOpen && (
                 <div className="md:hidden absolute top-16 left-0 right-0 carbon-bg border-b border-border-color shadow-2xl animate-in slide-in-from-top-4 duration-200">
                     <div className="flex flex-col p-4 space-y-2">
-                        <MobileNavLink href="/dashboard" icon={<Gauge className="w-4 h-4" />} label="DASHBOARD" isActive={pathname === '/dashboard'} />
-                        <MobileNavLink href="/tracks" icon={<Map className="w-4 h-4" />} label="TRACKS" isActive={pathname.startsWith('/tracks')} />
-                        <MobileNavLink href="/sessions" icon={<Timer className="w-4 h-4" />} label="SESSIONS" isActive={pathname.startsWith('/sessions')} />
-                        <MobileNavLink href="/device" icon={<MonitorSmartphone className="w-4 h-4" />} label="DEVICES" isActive={pathname.startsWith('/device')} />
-                        <MobileNavLink href="/account" icon={<User className="w-4 h-4" />} label="ACCOUNT" isActive={pathname === '/account'} />
+                        <MobileNavLink href="/" icon={<HistoryIcon className="w-4 h-4" />} label="FEED" isActive={pathname === '/'} />
+                        <MobileNavLink href="/dashboard" icon={<Zap className="w-4 h-4" />} label="HUB" isActive={pathname === '/dashboard'} />
+                        <MobileNavLink href="/tracks" icon={<MapIcon className="w-4 h-4" />} label="TRACKS" isActive={pathname.startsWith('/tracks')} />
+                        <MobileNavLink href="/device" icon={<SettingsIcon className="w-4 h-4" />} label="SYSTEM" isActive={pathname.startsWith('/device') || pathname.startsWith('/account')} />
 
                         <div className="h-[1px] bg-border-color my-2"></div>
 

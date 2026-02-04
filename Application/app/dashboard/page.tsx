@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, TrendingUp, MapPin, Calendar, Search, Edit, Trash2, Upload, ChevronLeft, ChevronRight, Zap, Trophy } from 'lucide-react';
+import { Clock, TrendingUp, MapPin, Calendar, Search, Edit, Trash2, Upload, ChevronLeft, ChevronRight, Zap, Trophy, Activity, Satellite, Gauge, History, Settings, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import MapWrapper from "../components/MapWrapper";
 import Speedometer from "../components/Speedometer";
@@ -53,7 +53,7 @@ export default function DashboardPage() {
       {/* Dashboard Content */}
       <div className="container mx-auto px-4 py-6 space-y-6">
 
-        {/* Stats Grid - FoxLAP Inspired */}
+        {/* Stats Grid - High Contrast Analytics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard
             icon={<Trophy className="w-5 h-5" />}
@@ -71,16 +71,16 @@ export default function DashboardPage() {
           />
           <StatCard
             icon={<MapPin className="w-5 h-5" />}
-            label="TOTAL DISTANCE"
+            label="LIFETIME"
             value="1,245 km"
-            subtext="Lifetime"
+            subtext="Driven Distance"
             color="warning"
           />
           <StatCard
             icon={<Clock className="w-5 h-5" />}
-            label="TOTAL HOURS"
+            label="ENGINE"
             value="24.5 h"
-            subtext="Engine Running"
+            subtext="Active Time"
             color="primary"
           />
         </div>
@@ -135,6 +135,24 @@ export default function DashboardPage() {
                 <DragModeView />
               </div>
             )}
+          </div>
+        </div>
+
+        {/* 8-Module HUB Grid */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-racing text-primary tracking-[0.2em] italic">PRO HUB</h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-primary/30 to-transparent"></div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <ModuleTile icon={<Trophy className="w-6 h-6" />} label="LAP TIMER" href="/tracks" color="highlight" />
+            <ModuleTile icon={<Zap className="w-6 h-6" />} label="DRAG METER" href="#" onClick={() => { setViewMode('drag'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} color="primary" />
+            <ModuleTile icon={<Activity className="w-6 h-6" />} label="RPM SENSOR" href="/rpm" color="highlight" />
+            <ModuleTile icon={<Gauge className="w-6 h-6" />} label="SPEEDO" href="#" onClick={() => { setViewMode('track'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} color="primary" />
+            <ModuleTile icon={<History className="w-6 h-6" />} label="HISTORY" href="/" color="warning" />
+            <ModuleTile icon={<Satellite className="w-6 h-6" />} label="GPS STATUS" href="/gps" color="highlight" />
+            <ModuleTile icon={<Settings className="w-6 h-6" />} label="SETTINGS" href="/device" color="text-secondary" />
+            <ModuleTile icon={<RefreshCw className="w-6 h-6" />} label="SYNC" href="#" color="primary" />
           </div>
         </div>
 
@@ -331,23 +349,26 @@ export default function DashboardPage() {
 }
 
 function StatCard({ icon, label, value, subtext, color }: { icon: React.ReactNode; label: string; value: string; subtext: string; color: string }) {
-  const colorClasses = {
+  const colorGlows = {
+    primary: 'shadow-glow-blue',
+    highlight: 'shadow-glow-green',
+    warning: 'shadow-glow-blue', // fallback
+  };
+
+  const colorTexts = {
     primary: 'text-primary',
     highlight: 'text-highlight',
     warning: 'text-warning',
   };
 
   return (
-    <div className="carbon-bg border border-border-color rounded-xl p-4 relative overflow-hidden group hover:border-primary/50 transition">
-      <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${colorClasses[color as keyof typeof colorClasses]}`}>
+    <div className={`glass-card rounded-2xl p-4 relative overflow-hidden group hover:border-primary/50 transition duration-500 ${colorGlows[color as keyof typeof colorGlows] ? 'hover:' + colorGlows[color as keyof typeof colorGlows] : ''}`}>
+      <div className={`absolute -top-2 -right-2 p-4 opacity-5 group-hover:opacity-10 transition-opacity ${colorTexts[color as keyof typeof colorTexts]}`}>
         {icon}
       </div>
-      <div className={`inline-flex p-2 rounded-lg bg-background-secondary mb-3 ${colorClasses[color as keyof typeof colorClasses]}`}>
-        {icon}
-      </div>
-      <div className="text-text-secondary text-xs font-racing mb-1 uppercase tracking-wider">{label}</div>
-      <div className="text-2xl font-data font-bold text-foreground mb-1">{value}</div>
-      <div className="text-text-secondary text-[10px] font-medium">{subtext}</div>
+      <div className="text-text-secondary text-[10px] font-racing mb-2 tracking-[0.1em]">{label}</div>
+      <div className={`text-2xl font-data font-bold tracking-tighter mb-1 ${colorTexts[color as keyof typeof colorTexts]}`}>{value}</div>
+      <div className="text-text-secondary text-[10px] opacity-60 font-medium uppercase">{subtext}</div>
     </div>
   );
 }
@@ -382,4 +403,28 @@ function TrackGroupCard({ track }: { track: any }) {
       </div>
     </Link>
   );
+}
+
+function ModuleTile({ icon, label, href, onClick, color = 'primary' }: { icon: React.ReactNode; label: string; href: string; onClick?: () => void; color?: string }) {
+  const colorTexts = {
+    primary: 'text-primary',
+    highlight: 'text-highlight',
+    warning: 'text-warning',
+    'text-secondary': 'text-text-secondary',
+  };
+
+  const content = (
+    <div
+      onClick={onClick}
+      className="glass-card rounded-2xl p-4 flex flex-col items-center justify-center gap-3 hover:bg-white/5 transition-all duration-300 group cursor-pointer aspect-square sm:aspect-auto sm:h-32 border border-white/5"
+    >
+      <div className={`p-4 rounded-2xl bg-background-secondary group-hover:bg-white/5 transition-all duration-500 ${colorTexts[color as keyof typeof colorTexts]} group-hover:scale-110 shadow-inner`}>
+        {icon}
+      </div>
+      <span className="text-[10px] font-racing text-white group-hover:text-primary transition-colors tracking-[0.2em]">{label}</span>
+    </div>
+  );
+
+  if (href === "#") return content;
+  return <Link href={href} className="block">{content}</Link>;
 }

@@ -3,6 +3,7 @@
 #include "../../core/SyncManager.h"
 #include "../../core/WiFiManager.h"
 #include "../fonts/Org_01.h"
+#include "SettingsScreen.h"
 
 extern SyncManager syncManager;
 extern WiFiManager wifiManager;
@@ -33,9 +34,9 @@ void SynchronizeScreen::onShow() {
 
   drawScreen(true);
 
-  // Back Button (Blue Triangle) - Bottom Left
-  tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                    SCREEN_HEIGHT - 19, TFT_BLUE);
+  // Back Button (Standardized Blue Triangle)
+  tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                    SCREEN_HEIGHT - 20, TFT_BLUE);
 }
 
 void SynchronizeScreen::update() {
@@ -63,8 +64,8 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
   if (fullRedraw) {
     tft->fillRect(0, 50, SCREEN_WIDTH, SCREEN_HEIGHT - 50, L_COLOR_BG);
     // Draw Back Button again on full redraw
-    tft->fillTriangle(10, SCREEN_HEIGHT - 25, 22, SCREEN_HEIGHT - 31, 22,
-                      SCREEN_HEIGHT - 19, TFT_BLUE);
+    tft->fillTriangle(15, SCREEN_HEIGHT - 30, 30, SCREEN_HEIGHT - 40, 30,
+                      SCREEN_HEIGHT - 20, TFT_BLUE);
   }
 
   // --- STATUS CARD ---
@@ -135,22 +136,13 @@ void SynchronizeScreen::drawScreen(bool fullRedraw) {
 }
 
 void SynchronizeScreen::handleTouch(int x, int y) {
-  // Back Button Area (Bottom Left)
-  if (x < 80 && y > SCREEN_HEIGHT - 60) {
-    static unsigned long lastBackTap = 0;
-    if (millis() - lastBackTap < 500) {
-      _ui->switchScreen(SCREEN_MENU);
-      lastBackTap = 0;
-    } else {
-      lastBackTap = millis();
-    }
+  // Back Button (Standardized Touch Box x < 80)
+  if (x < 80 && y > 240) {
+    _ui->switchScreen(SCREEN_MENU);
     return;
   }
 
   // Sync Button Area (Bottom Position)
-  // BtnW = 240, BtnX = (SCREEN_WIDTH - 240)/2 = 120
-  // BtnY = 200, BtnH = 50
-  // Touch Area: X=120-360, Y=190-260
   int btnW = 240;
   int btnX = (SCREEN_WIDTH - btnW) / 2;
 
